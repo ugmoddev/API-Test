@@ -1,1 +1,1 @@
-{"apis":{},"users":{"aaaaaa":{"pass":"aaaaaaaaaaa","createdAt":1782516621167,"role":"owner","avatar":""}},"sessions":{},"monitors":{}}
+{"apis":{},"users":{"aaaaaa":{"pass":"aaaaaaaaaaa","createdAt":1782516621167,"role":"owner","avatar":""}},"sessions":{"05c3f3fd9dedea7a75bd4cd4d047002dbab3bb5d10a80827affa6889b85ff76f":{"user":"aaaaaa","role":"user"}},"monitors":{}}
