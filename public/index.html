@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Trieu API | Galaxy Panel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #020510;
+      --surface: rgba(10, 14, 35, 0.75);
+      --border: rgba(255, 255, 255, 0.07);
+      --text: #c8d4f0;
+      --text-dim: #6b7db3;
+      --text-bright: #eef2ff;
+      --accent: #00f0a8;
+      --accent-dim: rgba(0, 240, 168, 0.12);
+      --cyan: #00aaff;
+      --cyan-dim: rgba(0, 170, 255, 0.12);
+      --purple: #b87fff;
+      --purple-dim: rgba(184, 127, 255, 0.12);
+      --red: #ff4d6a;
+      --red-dim: rgba(255, 77, 106, 0.12);
+      --green: #10b981;
+      --green-dim: rgba(16, 185, 129, 0.12);
+      --yellow: #eab308;
+      --yellow-dim: rgba(234, 179, 8, 0.12);
+      --r: 16px;
+      --r-sm: 10px;
+      --r-xs: 7px;
+      --glass: blur(20px) saturate(180%);
+    }
+
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; -webkit-font-smoothing:antialiased; }
+    body { font-family:'Inter',system-ui,-apple-system,sans-serif; background:var(--bg); color:var(--text); height:100dvh; display:flex; flex-direction:column; overflow:hidden; }
+
+    .noise { position:fixed; inset:0; z-index:0; pointer-events:none; opacity:.025; background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+    .bg-scene { position:fixed; inset:0; z-index:0; pointer-events:none; overflow:hidden; }
+    .bg-grad { position:absolute; inset:0; background:radial-gradient(ellipse 80% 60% at 10% 5%,rgba(0,240,168,.07) 0%,transparent 60%),radial-gradient(ellipse 60% 50% at 90% 80%,rgba(0,170,255,.05) 0%,transparent 60%),radial-gradient(ellipse 50% 40% at 50% 50%,rgba(184,127,255,.04) 0%,transparent 70%),linear-gradient(180deg,#020812 0%,#01030a 100%); }
+    .orb { position:absolute; border-radius:50%; filter:blur(70px); animation:orbDrift var(--d) ease-in-out infinite alternate; will-change:transform; }
+    .o1 { width:380px;height:380px;background:rgba(0,240,168,.07);top:-120px;left:-100px;--d:14s; }
+    .o2 { width:300px;height:300px;background:rgba(0,170,255,.06);bottom:10%;right:-80px;--d:17s;animation-delay:-7s; }
+    .o3 { width:220px;height:220px;background:rgba(184,127,255,.05);top:45%;left:35%;--d:20s;animation-delay:-12s; }
+    @keyframes orbDrift { from { transform:translate(0,0) scale(1); } to { transform:translate(40px,-30px) scale(1.12); } }
+
+    .grid { position:absolute; inset:0; background-image:linear-gradient(rgba(255,255,255,.018) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.018) 1px,transparent 1px); background-size:44px 44px; mask-image:radial-gradient(ellipse 100% 100% at 50% 0%,black 30%,transparent 80%); }
+    canvas#stars { position:absolute; inset:0; width:100%; height:100%; }
+    .scanlines { position:absolute; inset:0; pointer-events:none; background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.03) 2px,rgba(0,0,0,.03) 4px); }
+
+    .app { position:relative; z-index:1; display:flex; flex-direction:column; height:100%; width:100%; max-width:520px; margin:0 auto; }
+    .hdr { display:flex; align-items:center; justify-content:space-between; padding:10px 16px 8px; background:rgba(5,8,22,.7); backdrop-filter:var(--glass); -webkit-backdrop-filter:var(--glass); border-bottom:1px solid var(--border); flex-shrink:0; position:relative; z-index:20; }
+    .hdr::after { content:''; position:absolute; bottom:0; left:10%; width:80%; height:1px; background:linear-gradient(90deg,transparent,var(--accent),var(--cyan),transparent); opacity:.4; }
+    .logo-w { display:flex; flex-direction:column; gap:1px; }
+    .logo { font-family:'Space Grotesk',sans-serif; font-size:1.55rem; font-weight:700; letter-spacing:-.5px; line-height:1; background:linear-gradient(110deg,#00f0a8 0%,#00aaff 45%,#b87fff 100%); background-size:300% 300%; -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; animation:logoShimmer 6s ease-in-out infinite; }
+    @keyframes logoShimmer { 0%,100% { background-position:0% 50%; } 50% { background-position:100% 50%; } }
+    .logo-sub { font-size:.58rem; font-weight:600; color:var(--text-dim); letter-spacing:2px; text-transform:uppercase; }
+    .hdr-r { display:flex; align-items:center; gap:10px; }
+    .live-pill { display:none; align-items:center; gap:5px; padding:4px 10px; background:var(--green-dim); border:1px solid rgba(16,185,129,.25); border-radius:999px; font-size:.6rem; font-weight:700; color:var(--green); letter-spacing:1px; text-transform:uppercase; }
+    .live-pill.show { display:flex; }
+    .live-dot { width:6px; height:6px; border-radius:50%; background:var(--green); animation:lp 2s ease-in-out infinite; }
+    @keyframes lp { 0%,100% { box-shadow:0 0 0 0 rgba(16,185,129,.4); } 50% { box-shadow:0 0 0 5px rgba(16,185,129,0); } }
+    .av-ring { width:38px; height:38px; border-radius:50%; position:relative; cursor:pointer; flex-shrink:0; transition:transform .2s cubic-bezier(.34,1.56,.64,1); }
+    .av-ring:active { transform:scale(.88); }
+    @property --ang { syntax:"<angle>"; initial-value:0deg; inherits:false; }
+    .av-ring::before { content:''; position:absolute; inset:-2px; border-radius:50%; background:conic-gradient(from var(--ang,0deg),#00f0a8,#00aaff,#b87fff,#00f0a8); animation:spinRing 5s linear infinite; }
+    @keyframes spinRing { to { --ang:360deg; } }
+    .av-inner { position:absolute; inset:2px; border-radius:50%; background:#0d1228; display:flex; align-items:center; justify-content:center; overflow:hidden; z-index:1; }
+    .av-inner img { width:100%; height:100%; object-fit:cover; }
+    .av-char { font-size:1rem; font-weight:800; color:#fff; font-family:'Space Grotesk',sans-serif; }
+
+    .tab-rail { display:flex; align-items:stretch; background:rgba(5,8,22,.65); backdrop-filter:var(--glass); -webkit-backdrop-filter:var(--glass); border-bottom:1px solid var(--border); flex-shrink:0; position:relative; z-index:15; overflow:hidden; }
+    .tab-ind { position:absolute; bottom:0; height:2px; background:linear-gradient(90deg,var(--accent),var(--cyan)); border-radius:2px 2px 0 0; box-shadow:0 0 12px rgba(0,240,168,.6); transition:left .35s cubic-bezier(.65,0,.35,1),width .35s cubic-bezier(.65,0,.35,1); will-change:left,width; }
+    .tab-btn { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; padding:8px 4px 9px; cursor:pointer; color:var(--text-dim); transition:color .25s,background .25s; border:none; background:transparent; font-family:inherit; -webkit-user-select:none; user-select:none; }
+    .tab-btn.active { color:var(--text-bright); }
+    .tab-btn:active { background:rgba(255,255,255,.04); }
+    .tab-btn .ti { width:20px; height:20px; display:flex; align-items:center; justify-content:center; }
+    .tab-btn .ti svg { width:18px; height:18px; transition:filter .25s,transform .25s cubic-bezier(.34,1.56,.64,1); }
+    .tab-btn.active .ti svg { filter:drop-shadow(0 0 6px var(--accent)); transform:scale(1.12); }
+    .tab-lbl { font-size:.58rem; font-weight:700; letter-spacing:.8px; text-transform:uppercase; transition:color .25s; }
+    .tab-btn.active .tab-lbl { background:linear-gradient(90deg,var(--accent),var(--cyan)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+
+    .track { flex:1; position:relative; overflow:hidden; }
+    .panel { position:absolute; top:0; left:0; width:100%; height:100%; overflow-y:auto; overflow-x:hidden; -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain; overscroll-behavior-x:none; padding:14px; display:flex; flex-direction:column; gap:12px; transform:translateX(100%); transition:transform .38s cubic-bezier(.65,0,.35,1); will-change:transform; touch-action:pan-y; }
+    .panel.pan-active { transition:none; }
+    .panel.is-prev { transform:translateX(-100%); }
+    .panel.is-active { transform:translateX(0); }
+    .panel::-webkit-scrollbar { width:2px; }
+    .panel::-webkit-scrollbar-thumb { background:rgba(255,255,255,.08); border-radius:99px; }
+    .panel-chat { padding:10px; overflow:hidden; }
+
+    .card { background:var(--surface); backdrop-filter:var(--glass); -webkit-backdrop-filter:var(--glass); border:1px solid var(--border); border-radius:var(--r); padding:16px; position:relative; overflow:visible; animation:cIn .4s cubic-bezier(.34,1.56,.64,1) both; }
+    @keyframes cIn { from { opacity:0; transform:translateY(16px) scale(.97); } to { opacity:1; transform:none; } }
+    .card::before { content:''; position:absolute; top:0; left:15%; width:70%; height:1px; background:linear-gradient(90deg,transparent,rgba(255,255,255,.12),transparent); }
+    .card-glow { position:absolute; top:0; left:0; right:0; height:60px; background:radial-gradient(ellipse at 50% 0%,rgba(0,240,168,.06),transparent); pointer-events:none; }
+    .card-hdr { display:flex; align-items:center; gap:10px; margin-bottom:0; cursor:pointer; user-select:none; -webkit-user-select:none; }
+    .chev { margin-left:auto; flex-shrink:0; opacity:.4; transition:transform .32s cubic-bezier(.4,0,.2,1),opacity .2s; }
+    .chev svg { display:block; }
+    .card.open .chev { transform:rotate(180deg); opacity:.9; }
+    .card-body { overflow:hidden; max-height:0; transition:max-height .4s ease,padding-top .3s ease; padding-top:0; }
+    .card.open .card-body { max-height:9999px; padding-top:14px; }
+    .cico { width:32px; height:32px; border-radius:var(--r-xs); display:flex; align-items:center; justify-content:center; background:var(--accent-dim); border:1px solid rgba(0,240,168,.2); flex-shrink:0; }
+    .cico.c { background:var(--cyan-dim); border-color:rgba(0,170,255,.2); }
+    .cico.p { background:var(--purple-dim); border-color:rgba(184,127,255,.2); }
+    .cico.r { background:var(--red-dim); border-color:rgba(255,77,106,.2); }
+    .cico svg { width:16px; height:16px; }
+    .ctitle { font-family:'Space Grotesk',sans-serif; font-size:.8rem; font-weight:700; color:var(--text-bright); letter-spacing:.3px; }
+
+    .fld { display:flex; flex-direction:column; gap:5px; margin-bottom:10px; }
+    .flbl { font-size:.62rem; font-weight:600; color:var(--text-dim); letter-spacing:.8px; text-transform:uppercase; }
+    input,textarea,select { font-family:'Inter',sans-serif; font-size:.8rem; border-radius:var(--r-xs); padding:10px 13px; background:rgba(5,8,22,.7); border:1px solid var(--border); color:var(--text-bright); outline:none; transition:border-color .2s,box-shadow .2s,background .2s; width:100%; -webkit-appearance:none; appearance:none; }
+    input::placeholder,textarea::placeholder { color:var(--text-dim); }
+    input:focus,textarea:focus,select:focus { border-color:rgba(0,240,168,.5); box-shadow:0 0 0 3px rgba(0,240,168,.07),inset 0 0 0 1px rgba(0,240,168,.1); background:rgba(5,8,22,.9); }
+    textarea { min-height:60px; resize:vertical; }
+    select { background-image:url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%236b7db3' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 12px center; padding-right:32px; cursor:pointer; }
+    select option { background:#0d1228; color:var(--text-bright); }
+
+    .row { display:flex; gap:8px; margin-bottom:10px; }
+    .row>* { flex:1; }
+    .row>.sm { flex:.6; }
+
+    .btn { font-family:'Space Grotesk',sans-serif; font-size:.72rem; font-weight:700; letter-spacing:.8px; text-transform:uppercase; border-radius:var(--r-xs); padding:11px 16px; border:none; cursor:pointer; transition:all .18s cubic-bezier(.34,1.56,.64,1); width:100%; position:relative; overflow:hidden; display:flex; align-items:center; justify-content:center; gap:7px; }
+    .btn::after { content:''; position:absolute; inset:0; background:radial-gradient(circle at var(--mx,50%) var(--my,50%),rgba(255,255,255,.15),transparent 60%); opacity:0; transition:opacity .3s; }
+    .btn:hover::after { opacity:1; }
+    .btn:active { transform:scale(.96); }
+    .btn-p { background:linear-gradient(135deg,#00e09a,#0099f0); color:#03120a; box-shadow:0 4px 20px rgba(0,200,140,.25); }
+    .btn-p:hover { box-shadow:0 6px 28px rgba(0,200,140,.38); }
+    .btn-d { background:linear-gradient(135deg,#c0253b,#e0424e); color:#fff; box-shadow:0 4px 16px rgba(200,40,60,.2); }
+    .btn-s { background:linear-gradient(135deg,#059669,#10b981); color:#fff; box-shadow:0 4px 16px rgba(16,185,129,.2); }
+    .btn-g { background:rgba(255,255,255,.05); border:1px solid var(--border); color:var(--text); }
+    .btn-g:hover { background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.12); }
+    .btn-v { background:linear-gradient(135deg,#7c3aed,#a855f7); color:#fff; box-shadow:0 4px 16px rgba(168,85,247,.2); }
+
+    .btn-row { display:flex; gap:8px; margin-bottom:10px; }
+    .btn-row .btn { margin:0; }
+
+    .out { margin-top:10px; padding:10px 12px; border-radius:var(--r-xs); background:rgba(3,5,18,.8); font-size:.68rem; font-family:'SF Mono','Consolas',monospace; white-space:pre-wrap; word-break:break-all; border:1px solid var(--border); max-height:140px; overflow-y:auto; color:var(--text); line-height:1.5; -webkit-overflow-scrolling:touch; }
+    pre.out { max-height:220px; overflow:auto; font-size:.65rem; }
+
+    .badge { display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:999px; font-size:.58rem; font-weight:700; letter-spacing:.5px; text-transform:uppercase; }
+    .bg-green { background:var(--green-dim); color:var(--green); border:1px solid rgba(16,185,129,.2); }
+    .bg-dim { background:rgba(40,50,80,.5); color:var(--text-dim); }
+    .bg-red { background:var(--red-dim); color:var(--red); border:1px solid rgba(255,77,106,.2); }
+    .bg-yellow { background:var(--yellow-dim); color:var(--yellow); border:1px solid rgba(234,179,8,.2); }
+    .bg-blue { background:var(--cyan-dim); color:var(--cyan); border:1px solid rgba(0,170,255,.2); }
+
+    .irow { display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border); font-size:.75rem; }
+    .irow:last-child { border-bottom:none; }
+    .irow .k { color:var(--text-dim); font-size:.68rem; }
+    .irow .v { color:var(--text-bright); font-weight:600; font-family:'Space Grotesk',sans-serif; }
+
+    .api-item,.bot-item,.mon-item { background:rgba(10,14,35,.6); border:1px solid var(--border); border-radius:var(--r-sm); padding:13px; margin-bottom:8px; transition:border-color .2s; animation:cIn .35s both; }
+    .api-item:hover,.bot-item:hover,.mon-item:hover { border-color:rgba(0,240,168,.2); }
+    .api-name,.bot-name,.mon-name { font-family:'Space Grotesk',sans-serif; font-weight:700; color:var(--accent); font-size:.85rem; margin-bottom:5px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .bot-name { color:var(--cyan); }
+    .mon-name { color:var(--cyan); }
+    .api-meta { font-size:.68rem; color:var(--text-dim); margin-bottom:6px; line-height:1.6; }
+    .api-key { font-size:.6rem; color:var(--text-dim); font-family:monospace; margin-bottom:8px; word-break:break-all; }
+    .log-area { background:rgba(3,5,18,.9); border:1px solid var(--border); border-radius:var(--r-xs); padding:10px; height:150px; overflow-y:auto; font-family:'SF Mono','Consolas',monospace; font-size:.65rem; color:#7fff9a; line-height:1.5; margin:8px 0; }
+    .mon-url { font-size:.65rem; color:var(--text-dim); word-break:break-all; margin-bottom:8px; }
+    .mon-stats { display:flex; gap:16px; margin:8px 0; }
+    .mon-stat-val { font-size:1.3rem; font-weight:700; font-family:'Space Grotesk',sans-serif; }
+    .mon-stat-lbl { font-size:.58rem; color:var(--text-dim); }
+    .hbar { display:flex; gap:2px; height:20px; align-items:flex-end; margin:6px 0; }
+    .hbar-dot { flex:1; border-radius:1px; min-height:6px; cursor:default; }
+    .h-on { background:var(--accent); opacity:.8; }
+    .h-off { background:var(--red); opacity:.8; }
+
+    .chat-box { display:flex; flex-direction:column; height:100%; gap:10px; }
+    .chat-msgs { flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:12px; display:flex; flex-direction:column; gap:10px; overscroll-behavior:contain; background:rgba(5,8,22,.5); backdrop-filter:var(--glass); border:1px solid var(--border); border-radius:var(--r); }
+    .chat-msgs::-webkit-scrollbar { width:2px; }
+    .chat-msgs::-webkit-scrollbar-thumb { background:rgba(255,255,255,.08); border-radius:99px; }
+    .cmsg { display:flex; gap:9px; align-items:flex-start; animation:msgIn .25s cubic-bezier(.34,1.56,.64,1) both; }
+    @keyframes msgIn { from { opacity:0; transform:translateY(8px) scale(.96); } to { opacity:1; transform:none; } }
+    .cav { width:30px; height:30px; border-radius:50%; background:linear-gradient(135deg,#1e2a5e,#2a3570); flex-shrink:0; display:flex; align-items:center; justify-content:center; font-weight:800; color:#fff; font-size:.7rem; border:1px solid rgba(255,255,255,.1); overflow:hidden; }
+    .cav img { width:100%; height:100%; object-fit:cover; }
+    .cbw { display:flex; flex-direction:column; gap:3px; max-width:78%; }
+    .cname { font-size:.62rem; font-weight:700; color:var(--cyan); }
+    .cbbl { background:rgba(16,22,52,.75); backdrop-filter:blur(8px); padding:8px 12px; border-radius:12px 12px 12px 4px; font-size:.78rem; word-break:break-word; border:1px solid var(--border); line-height:1.5; color:var(--text); }
+    .chat-in-row { display:flex; gap:8px; flex-shrink:0; }
+    .chat-in-row input { flex:1; }
+    .chat-in-row .btn { width:auto; padding:10px 18px; }
+
+    .modal-bg { position:fixed; inset:0; background:rgba(0,0,0,.75); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); z-index:200; display:flex; align-items:center; justify-content:center; animation:fbg .2s ease; }
+    @keyframes fbg { from { opacity:0; } to { opacity:1; } }
+    .modal { background:rgba(10,14,35,.95); backdrop-filter:var(--glass); border:1px solid rgba(255,255,255,.1); border-radius:22px; padding:24px; width:92%; max-width:360px; box-shadow:0 30px 70px rgba(0,0,0,.8); animation:mIn .3s cubic-bezier(.34,1.56,.64,1); }
+    @keyframes mIn { from { opacity:0; transform:scale(.9) translateY(20px); } to { opacity:1; transform:none; } }
+    .modal-ttl { font-family:'Space Grotesk',sans-serif; font-size:1.1rem; font-weight:700; color:var(--text-bright); margin-bottom:18px; display:flex; align-items:center; gap:10px; }
+
+    .hidden { display:none !important; }
+    .sp { height:8px; }
+    @media (max-width:380px) {
+      .logo { font-size:1.3rem; }
+      input,select,textarea { padding:9px 11px; font-size:.75rem; }
+      .btn { padding:10px 12px; font-size:.68rem; }
+      .card { padding:13px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="noise"></div>
+  <div class="bg-scene">
+    <div class="bg-grad"></div>
+    <div class="orb o1"></div>
+    <div class="orb o2"></div>
+    <div class="orb o3"></div>
+    <div class="grid"></div>
+    <canvas id="stars"></canvas>
+    <div class="scanlines"></div>
+  </div>
+
+  <div class="app">
+    <div class="hdr">
+      <div class="logo-w">
+        <div class="logo">Trieu</div>
+        <div class="logo-sub">Galaxy Panel</div>
+      </div>
+      <div class="hdr-r">
+        <div class="live-pill" id="livePill"><span class="live-dot"></span><span>Live</span></div>
+        <div class="av-ring" id="avatarBtn">
+          <div class="av-inner">
+            <img id="avatarImg" src="" alt="" style="display:none">
+            <span class="av-char" id="avatarChar">?</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-rail" id="tabRail">
+      <div class="tab-ind" id="tabInd"></div>
+      <button class="tab-btn active" data-tab="0">
+        <div class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+        <span class="tab-lbl">Auth</span>
+      </button>
+      <button class="tab-btn" data-tab="1" id="tabApi" style="display:none">
+        <div class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg></div>
+        <span class="tab-lbl">API</span>
+      </button>
+      <button class="tab-btn" data-tab="2" id="tabAdmin" style="display:none">
+        <div class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+        <span class="tab-lbl">Owner</span>
+      </button>
+      <button class="tab-btn" data-tab="3" id="tabBot" style="display:none">
+        <div class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><line x1="12" y1="15" x2="12" y2="17"/></svg></div>
+        <span class="tab-lbl">Bot</span>
+      </button>
+      <button class="tab-btn" data-tab="4" id="tabUptime" style="display:none">
+        <div class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+        <span class="tab-lbl">Uptime</span>
+      </button>
+      <button class="tab-btn" data-tab="5">
+        <div class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+        <span class="tab-lbl">Chat</span>
+      </button>
+    </div>
+
+    <div class="track" id="track">
+
+      <!-- Auth Panel -->
+      <div class="panel is-active" id="p0">
+        <div class="card open">
+          <div class="card-glow"></div>
+          <div class="card-hdr" onclick="toggleCard(this)">
+            <div class="cico"><svg viewBox="0 0 24 24" fill="none" stroke="#00f0a8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+            <span class="ctitle">Dang nhap / Dang ky</span>
+            <div class="chev"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></div>
+          </div>
+          <div class="card-body">
+            <div class="fld"><div class="flbl">Ten dang nhap</div><input id="authUser" placeholder="Nhap ten dang nhap" autocomplete="off"></div>
+            <div class="fld"><div class="flbl">Mat khau</div><input id="authPass" placeholder="Nhap mat khau" type="password" autocomplete="off"></div>
+            <div class="btn-row" style="margin-top:4px">
+              <button class="btn btn-g" onclick="registerUser()">Dang ky</button>
+              <button class="btn btn-p" onclick="loginUser()">Dang nhap</button>
+            </div>
+            <button class="btn btn-d" style="margin-top:8px" onclick="logoutUser()">Dang xuat</button>
+            <div id="authStatus" class="out" style="display:none"></div>
+          </div>
+        </div>
+        <div class="card open" id="userInfoCard" style="display:none">
+          <div class="card-hdr" onclick="toggleCard(this)">
+            <div class="cico"><svg viewBox="0 0 24 24" fill="none" stroke="#00f0a8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+            <span class="ctitle">Thong tin tai khoan</span>
+            <div class="chev"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></div>
+          </div>
+          <div class="card-body"><div id="userInfoText"></div></div>
+        </div>
+      </div>
+
+      <!-- API Panel -->
+      <div class="panel" id="p1">
+        <div class="card open">
+          <div class="card-glow"></div>
+          <div class="card-hdr" onclick="toggleCard(this)">
+            <div class="cico c"><svg viewBox="0 0 24 24" fill="none" stroke="#00aaff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+            <span class="ctitle">Tao API moi</span>
+            <div class="chev"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></div>
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <div class="fld" style="margin:0"><div class="flbl">Ten API</div><input id="apiName" placeholder="Duy nhat (a-z 0-9 _)"></div>
+              <div class="fld" style="margin:0"><div class="flbl">Ten hien thi</div><input id="apiDisplay" placeholder="Hien thi"></div>
+            </div>
+            <div class="sp"></div>
+            <div class="fld"><div class="flbl">Webhook URL</div><input id="apiWebhook" placeholder="https://..."></div>
+            <div class="row">
+              <div class="fld" style="margin:0"><div class="flbl">Quyen truy cap</div><select id="apiPrivate"><option value="false">Public</option><option value="true">Private IP</option></select></div>
+              <div class="fld" style="margin:0"><div class="flbl">View IP</div><input id="apiViewIP" placeholder="IP"></div>
+            </div>
+            <div class="sp"></div>
+            <div class="fld"><div class="flbl">Prefix job</div><input id="apiPrefix" placeholder="Prefix"></div>
+            <div class="fld"><div class="flbl">Suffix job</div><input id="apiSuffix" placeholder="Suffix"></div>
+            <div class="row">
+              <div class="fld" style="margin:0"><div class="flbl">Max/boss</div><input id="apiMaxBoss" placeholder="0" type="number"></div>
+              <div class="fld" style="margin:0"><div class="flbl">Tong jobs</div><input id="apiMaxTotal" placeholder="0" type="number"></div>
+            </div>
+            <div class="fld"><div class="flbl">Thu tu job</div><select id="apiSort"><option value="desc">Moi nhat truoc</option><option value="asc">Cu nhat truoc</option></select></div>
+            <div class="fld"><div class="flbl">Whitelist IPs (moi dong 1 IP)</div><textarea id="apiWhitelist" placeholder="Whitelist IPs"></textarea></div>
+            <div class="fld"><div class="flbl">Custom fields (phan cach dau phay)</div><textarea id="apiFields" placeholder="field1, field2"></textarea></div>
+            <div class="fld"><div class="flbl">Custom webhook JSON</div><textarea id="apiWebhookCustom" placeholder="JSON"></textarea></div>
+            <button class="btn btn-p" onclick="createAPI()">Tao API</button>
+            <div id="apiCreateStatus" class="out" style="display:none"></div>
+          </div>
+        </div>
+        <div class="card open">
+          <div class="card-hdr" onclick="toggleCard(this)">
+            <div class="cico"><svg viewBox="0 0 24 24" fill="none" stroke="#00f0a8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>
+            <span class="ctitle">API cua toi</span>
+            <div class="chev"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></div>
+          </div>
+          <div class="card-body">
+            <button class="btn btn-g" onclick="loadMyAPIs()">Lam moi danh sach</button>
+            <div id="myAPIs" style="margin-top:10px"></div>
+          </div>
+        </div>
+        <div class="card" id="cardSetApi">
+          <div class="card-hdr" onclick="toggleCard(this)">
+            <div class="cico p"><svg viewBox="0 0 24 24" fill="none" stroke="#b87fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg></div>
+            <span class="ctitle">Cai dat API</span>
+            <div class="chev"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></div>
+          </div>
+          <div class="card-body">
+            <div class="fld"><div class="flbl">ID API</div><input id="setApiId" placeholder="API ID"></div>
+            <div class="row">
+              <div class="fld" style="margin:0"><div class="flbl">Ten hien thi</div><input id="setDisplay" placeholder="Ten moi"></div>
+              <div class="fld" style="margin:0"><div class="flbl">TTL (giay)</div><input id="setTTL" placeholder="60" type="number"></div>
+            </div>
+            <div class="fld"><div class="flbl">Webhook URL</div><input id="setWebhook" placeholder="https://..."></div>
+            <div class="row">
+              <div class="fld" style="margin:0"><div class="flbl">Quyen truy cap</div><select id="setPrivate"><option value="false">Public</option><option value="true">Private IP</option></select></div>
+              <div class="fld" style="margin:0"><div class="flbl">View IP</div><input id="setIP" placeholder="IP"></div>
+            </div>
+            <div class="row">
+              <div class="fld" style="margin:0"><div class="flbl">Trung lap</div><select id="setDup"><option value="false">Cho phep</option><option value="true">Xoa trung</option></select></div>
+              <div class="fld" style="margin:0"><div class="flbl">Trang thai</div><select id="setEnabled"><option value="true">Bat</option><option value="false">Tat</option></select></div>
+            </div>
+            <div class="row">
+              <div class="fld" style="margin:0"><div class="flbl">Thu tu</div><select id="setSort"><option value="desc">Moi nhat</option><option value="asc">Cu nhat</option></select></div>
+              <div class="fld" style="margin:0"><div class="flbl">Prefix</div><input id="setPrefix" placeholder="Prefix"></div>
+              <div class="fld" style="margin:0"><div class="flbl">Suffix</div><input id="setSuffix" placeholder="Suffix"></div>
+            </div>
+            <div class="row">
+              <div class="fld" style="margin:0"><div class="flbl">Max/boss</div><input id="setMaxBoss" type="number" placeholder="0"></div>
+              <div class="fld" style="margin:0"><div class="flbl">Tong jobs</div><input id="setMaxTotal" type="number" placeholder="0"></div>
+            </div>
+            <div class="fld"><div class="flbl">Whitelist IPs</div><textarea id="setWhitelist" placeholder="Moi dong 1 IP"></textarea></div>
+            <div class="fld"><div class="flbl">Custom fields</div><textarea id="setFields" placeholder="Phan cach dau phay"></textarea></div>
+            <div class="fld"><div class="flbl">Custom webhook JSON</div><textarea id="setWebhookCustom" placeholder="JSON"></textarea></div>
+            <div class="fld"><div class="flbl">Encode JSON</div><textarea id="setEncode" placeholder="JSON"></textarea></div>
+            <button class="btn btn-p" onclick="saveAPISettings()">Luu cai dat</button>
+            <div id="setStatus" class="out" style="display:none"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-hdr" onclick="toggleCard(this)">
+            <div class="cico c"><svg viewBox="0 0 24 24" fill="none" stroke="#00aaff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></div>
+            <span class="ctitle">Xem API</span>
+            <div class="chev"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></div>
+          </div>
+          <div class="card-body">
+            <div class="row"><input id="viewId" placeholder="API ID"><input id="viewBoss" placeholder="boss / all"></div>
+            <div class="row">
+              <div class="fld sm" style="margin:0"><div class="flbl">Trang</div><input id="viewPage" value="1" type="number"></div>
+              <div class="fld sm" style="margin:0"><div class="flbl">Limit</div><input id="viewLimit" value="50" type="number"></div>
+              <div class="fld" style="margin:0"><div class="flbl">Thu tu</div><select id="viewSort"><option value="desc">Moi</option><option value="asc">Cu</option></select></div>
+              <div class="fld" style="margin:0"><div class="flbl">Nhom</div><select id="viewGroup"><option value="false">Phang</option><option value="true">Nhom</option></select></div>
+            </div>
+            <button class="btn btn-g" onclick="loadViewAPI()">Tai du lieu</button>
+            <pre id="viewOutput" class="out" style="display:none"></pre>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-hdr" onclick="toggleCard(this)">
+            <div class="cico r"><svg viewBox="0 0 24 24" fill="none" stroke="#ff4d6a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></div>
+            <span class="ctitle">Quan ly Jobs</span>
+            <div class="chev"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></div>
+          </div>
+          <div class="card-body">
+            <div class="row"><input id="mgrId" placeholder="API ID"><input id="mgrBoss" placeholder="Ten Boss"></div>
+            <div class="row"><input id="mgrJob" placeholder="Job ID can xoa"><input id="mgrIndex" placeholder="Index" type="number"></div>
+            <div class="btn-row">
+              <button class="btn btn-d" onclick="deleteJob()">Xoa Job</button>
+              <button class="btn btn-g" onclick="clearBoss()">Xoa Boss</button>
+            </div>
+            <div class="btn-row">
+              <button class="btn btn-s" onclick="clearAllBoss()">Xoa tat ca Jobs</button>
+              <button class="btn btn-d" onclick="deleteAPI()">Xoa API</button>
+            </div>
+            <button class="btn btn-g" onclick="loadStats()" style="margin-top:4px">Xem thong ke</button>
+            <div id="mgrStatus" class="out" style="display:none"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Owner Panel -->
+      <div class="panel" id="p2">
+        <div class="card">
+          <div class="card-glow"></div>
+          <div class="card-hdr" onclick="toggleCard(this)">
+            <div class="cico p"><svg viewBox="0 0 24 24" fill="none" stroke="#b87fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+            <span class="ctitle">Owner Panel</span>
+            <div class="chev"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></div>
+          </div>
+          <div class="card-body">
+            <div class="btn-row">
+              <button class="btn btn-g" onclick="loadOwnerData()">Load Full DB</button>
+              <button class="btn btn-s" onclick="cleanAllExpired()">Clean Expired</button>
+            </div>
+            <div id="ownerDataOutput" class="out" style="display:none;max-height:250px"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-hdr" onclick="toggleCard(this)">
+            <div class="cico c"><svg viewBox="0 0 24 24" fill="none" stroke="#00aaff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+            <span class="ctitle">Quan ly nguoi dung</span>
+            <div class="chev"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></div>
+          </div>
+          <div class="card-body">
+            <button class="btn btn-g" onclick="loadAdminUsers()" style="margin-bottom:10px">Tai danh sach users</button>
+            <div id="adminUsersList" style="margin-bottom:10px"></div>
+            <div class="fld"><div class="flbl">Username</div><input id="adminUser" placeholder="Username"></div>
+            <div class="fld"><div class="flbl">Role moi</div><select id="adminRole"><option value="member">Member</option><option value="admin">Admin</option></select></div>
+            <button class="btn btn-v" onclick="setUserRole()">Cap nhat role</button>
+            <div id="adminRoleStatus" class="out" style="display:none"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-hdr" onclick="toggleCard(this)">
+            <div class="cico"><svg viewBox="0 0 24 24" fill="none" stroke="#00f0a8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+            <span class="ctitle">Thong ke he thong</span>
+            <div class="chev"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></div>
+          </div>
+          <div class="card-body">
+            <button class="btn btn-g" onclick="loadOwnerStats()">Tai thong ke</button>
+            <div id="adminStats" class="out" style="display:none"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-hdr" onclick="toggleCard(this)">
+            <div class="cico p"><svg viewBox="0 0 24 24" fill="none" stroke="#b87fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg></div>
+            <span class="ctitle">Global Settings</span>
+            <div class="chev"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></div>
+          </div>
+          <div class="card-body">
+            <button class="btn btn-g" onclick="loadGlobalSettings()" style="margin-bottom:10px">Tai global settings</button>
+            <div class="row">
+              <div class="fld" style="margin:0"><div class="flbl">TTL (giay)</div><input id="gsTTL" placeholder="60" type="number"></div>
+              <div class="fld" style="margin:0"><div class="flbl">Max/boss</div><input id="gsMaxBoss" type="number" placeholder="0"></div>
+              <div class="fld" style="margin:0"><div class="flbl">Tong jobs</div><input id="gsMaxTotal" type="number" placeholder="0"></div>
+            </div>
+            <div class="row">
+              <div class="fld" style="margin:0"><div class="flbl">Prefix</div><input id="gsPrefix" placeholder="Prefix"></div>
+              <div class="fld" style="margin:0"><div class="flbl">Suffix</div><input id="gsSuffix" placeholder="Suffix"></div>
+            </div>
+            <div class="row">
+              <div class="fld" style="margin:0"><div class="flbl">Thu tu</div><select id="gsSort"><option value="desc">Moi nhat</option><option value="asc">Cu nhat</option></select></div>
+              <div class="fld" style="margin:0"><div class="flbl">Trung lap</div><select id="gsDup"><option value="false">Cho phep</option><option value="true">Xoa trung</option></select></div>
+            </div>
+            <div class="fld"><div class="flbl">Encode JSON</div><textarea id="gsEncode" placeholder="JSON"></textarea></div>
+            <button class="btn btn-p" onclick="saveGlobalSettings()">Luu global settings</button>
+            <div id="gsStatus" class="out" style="display:none"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-hdr" onclick="toggleCard(this)">
+            <div class="cico r"><svg viewBox="0 0 24 24" fill="none" stroke="#ff4d6a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg></div>
+            <span class="ctitle">Reset API Key / Doi Owner</span>
+            <div class="chev"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></div>
+          </div>
+          <div class="card-body">
+            <div class="fld"><div class="flbl">API ID</div><input id="resetKeyId" placeholder="API ID"></div>
+            <div class="btn-row"><button class="btn btn-d" onclick="resetAPIKey()">Reset API Key</button></div>
+            <div id="resetKeyStatus" class="out" style="display:none"></div>
+            <div class="sp"></div>
+            <div class="fld"><div class="flbl">API ID</div><input id="changeOwnerId" placeholder="API ID"></div>
+            <div class="fld"><div class="flbl">Owner moi</div><input id="changeOwnerNew" placeholder="Username moi"></div>
+            <button class="btn btn-v" onclick="changeAPIOwner()">Doi Owner</button>
+            <div id="changeOwnerStatus" class="out" style="display:none"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bot Panel -->
+      <div class="panel" id="p3">
+        <div class="card open">
+          <div class="card-glow"></div>
+          <div class="card-hdr" onclick="toggleCard(this)">
+            <div class="cico c"><svg viewBox="0 0 24 24" fill="none" stroke="#00aaff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><line x1="12" y1="15" x2="12" y2="17"/></svg></div>
+            <span class="ctitle">Host Bot Discord Free</span>
+            <div class="chev"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></div>
+          </div>
+          <div class="card-body">
+            <div id="botLimitInfo" style="margin-bottom:10px"></div>
+            <div class="fld"><div class="flbl">Ten bot</div><input id="botName" placeholder="Ten bot Discord cua ban"></div>
+            <div class="fld"><div class="flbl">Code Python (.py)</div><textarea id="botCode" placeholder="Paste code Python tai day..." style="height:100px;font-family:monospace"></textarea></div>
+            <div class="fld"><div class="flbl">Hoac upload file .py</div><input type="file" id="botFile" accept=".py" style="cursor:pointer;padding:8px"></div>
+            <div class="fld"><div class="flbl">ENV Variables (JSON)</div><textarea id="botEnv" placeholder='{"TOKEN":"abc","PREFIX":"!"}' style="height:60px;font-family:monospace"></textarea></div>
+            <div class="fld" style="flex-direction:row;align-items:center;gap:10px;margin-bottom:10px">
+              <input type="checkbox" id="botAutoRestart" style="width:auto;margin:0">
+              <label for="botAutoRestart" style="font-size:.75rem;color:var(--text)">Tu dong restart (toi da 5 lan)</label>
+            </div>
+            <button class="btn btn-p" onclick="createBot()">Tao Bot</button>
+            <div id="botCreateMsg" class="out" style="display:none"></div>
+          </div>
+        </div>
+        <div class="card open">
+          <div class="card-hdr" onclick="toggleCard(this)">
+            <div class="cico"><svg viewBox="0 0 24 24" fill="none" stroke="#00f0a8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></div>
+            <span class="ctitle">Bot cua toi</span>
+            <div class="chev"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></div>
+          </div>
+          <div class="card-body">
+            <button class="btn btn-g" onclick="loadBots()" style="margin-bottom:10px">Lam moi</button>
+            <div id="botList"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Uptime Panel -->
+      <div class="panel" id="p4">
+        <div class="card open">
+          <div class="card-glow"></div>
+          <div class="card-hdr" onclick="toggleCard(this)">
+            <div class="cico c"><svg viewBox="0 0 24 24" fill="none" stroke="#00aaff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+            <span class="ctitle">Them Monitor moi</span>
+            <div class="chev"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></div>
+          </div>
+          <div class="card-body">
+            <div class="fld"><div class="flbl">Ten monitor</div><input id="monName" placeholder="VD: My Bot Server"></div>
+            <div class="fld"><div class="flbl">URL can theo doi</div><input id="monUrl" placeholder="https://..."></div>
+            <div class="fld"><div class="flbl">Kiem tra moi</div><select id="monInterval"><option value="60000">1 phut</option><option value="120000">2 phut</option><option value="300000">5 phut</option><option value="600000">10 phut</option></select></div>
+            <div class="fld"><div class="flbl">Discord Webhook (tuy chon)</div><input id="monWebhook" placeholder="https://discord.com/api/webhooks/..."></div>
+            <button class="btn btn-p" onclick="createMonitor()">Them Monitor</button>
+            <div id="monCreateMsg" class="out" style="display:none"></div>
+          </div>
+        </div>
+        <div class="card open">
+          <div class="card-hdr" onclick="toggleCard(this)">
+            <div class="cico"><svg viewBox="0 0 24 24" fill="none" stroke="#00f0a8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></div>
+            <span class="ctitle">Danh sach Monitor</span>
+            <div class="chev"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></div>
+          </div>
+          <div class="card-body">
+            <button class="btn btn-g" onclick="loadMonitors()" style="margin-bottom:10px">Lam moi</button>
+            <div id="monList"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chat Panel -->
+      <div class="panel panel-chat" id="p5">
+        <div class="chat-box">
+          <div class="chat-msgs" id="chatMessages"></div>
+          <div class="chat-in-row">
+            <input id="chatInput" placeholder="Nhap tin nhan..." autocomplete="off">
+            <button class="btn btn-p" id="chatSendBtn">Gui</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="modal-bg hidden" id="settingsModal">
+    <div class="modal">
+      <div class="modal-ttl"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00f0a8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> Ho so</div>
+      <div class="fld"><div class="flbl">Ten moi</div><input id="modalUsername" placeholder="Ten hien thi"></div>
+      <div class="fld"><div class="flbl">URL Avatar</div><input id="modalAvatar" placeholder="https://..."></div>
+      <div class="fld"><div class="flbl">Mat khau moi</div><input id="modalNewPass" placeholder="Toi thieu 8 ky tu" type="password"></div>
+      <div class="fld"><div class="flbl">Mat khau hien tai</div><input id="modalOldPass" placeholder="Xac nhan" type="password"></div>
+      <button class="btn btn-p" onclick="saveProfile()">Luu thay doi</button>
+      <button class="btn btn-g" onclick="closeModal()" style="margin-top:8px">Dong</button>
+      <div id="modalStatus" class="out" style="display:none"></div>
+    </div>
+  </div>
+
+  <script>
+    (function() {
+      const $ = s => document.getElementById(s);
+      const API_BASE = location.origin;
+      let token = localStorage.getItem("jmtoken") || "";
+      let role = localStorage.getItem("jmrole") || "";
+      let currentUser = "";
+      let currentAvatar = "";
+      let ws = null;
+      let currentTab = 0;
+
+      const trackEl = $("track");
+      const tabBtns = document.querySelectorAll(".tab-btn");
+      const indEl = $("tabInd");
+      const panels = [0, 1, 2, 3, 4, 5].map(i => $("p" + i));
+
+      function updateIndicator(btn) {
+        const rail = $("tabRail");
+        const rr = rail.getBoundingClientRect();
+        const br = btn.getBoundingClientRect();
+        indEl.style.left = (br.left - rr.left) + "px";
+        indEl.style.width = br.width + "px";
+      }
+
+      function goToTab(idx) {
+        currentTab = idx;
+        panels.forEach((p, i) => {
+          if (!p) return;
+          p.classList.remove("pan-active");
+          p.style.transform = "";
+          p.classList.remove("is-active", "is-prev");
+          if (i < idx) p.classList.add("is-prev");
+          else if (i === idx) p.classList.add("is-active");
+        });
+        tabBtns.forEach(b => {
+          const active = parseInt(b.dataset.tab) === idx;
+          b.classList.toggle("active", active);
+          if (active) updateIndicator(b);
+        });
+        if (idx === 3) loadBots();
+        if (idx === 4) loadMonitors();
+      }
+
+      tabBtns.forEach(btn => {
+        btn.addEventListener("click", () => goToTab(parseInt(btn.dataset.tab)));
+      });
+
+      function getVisibleTabIdxs() {
+        return Array.from(tabBtns).filter(b => b.style.display !== "none").map(b => parseInt(b.dataset.tab));
+      }
+
+      let tsX = 0, tsY = 0, tsT = 0, swipeDir = null;
+      document.addEventListener("touchstart", e => { tsX = e.touches[0].clientX; tsY = e.touches[0].clientY; tsT = Date.now(); swipeDir = null; }, { passive: true });
+      document.addEventListener("touchmove", e => {
+        const dx = e.touches[0].clientX - tsX, dy = e.touches[0].clientY - tsY;
+        if (swipeDir === null) { if (Math.abs(dy) > Math.abs(dx) + 15) { swipeDir = "v"; return; } if (Math.abs(dx) > Math.abs(dy) + 15) swipeDir = "h"; else return; }
+        if (swipeDir !== "h") return;
+        const idxs = getVisibleTabIdxs(), cur = idxs.indexOf(currentTab);
+        if ((dx > 0 && cur === 0) || (dx < 0 && cur === idxs.length - 1)) return;
+        panels.forEach((p, i) => { if (!p) return; p.classList.add("pan-active"); const base = (i - currentTab) * trackEl.offsetWidth; p.style.transform = "translateX(" + (base - dx) + "px)"; });
+      }, { passive: true });
+      document.addEventListener("touchend", e => {
+        if (swipeDir !== "h") { swipeDir = null; return; }
+        const dx = e.changedTouches[0].clientX - tsX, dt = Date.now() - tsT, vel = Math.abs(dx) / Math.max(dt, 1), w = trackEl.offsetWidth;
+        const threshold = vel > 0.4 ? w * 0.12 : w * 0.35;
+        const idxs = getVisibleTabIdxs(), cur = idxs.indexOf(currentTab);
+        let next = currentTab;
+        if (dx < -threshold && cur < idxs.length - 1) next = idxs[cur + 1];
+        else if (dx > threshold && cur > 0) next = idxs[cur - 1];
+        panels.forEach(p => p && p.classList.remove("pan-active"));
+        goToTab(next);
+        swipeDir = null;
+      }, { passive: true });
+
+      function toggleCard(hdr) { hdr.closest(".card").classList.toggle("open"); }
+      window.toggleCard = toggleCard;
+      function openCard(card) { if (card) card.classList.add("open"); }
+      window.openCard = openCard;
+      function setOut(id, text) { const el = $(id); if (!el) return; el.style.display = "block"; el.textContent = text; }
+
+      async function req(url, opt) {
+        opt = opt || {};
+        const headers = Object.assign({ "Content-Type": "application/json", authorization: token }, opt.headers || {});
+        try {
+          const r = await fetch(url, Object.assign({}, opt, { headers }));
+          const data = await r.json();
+          if (!r.ok) throw new Error(data.err || r.statusText);
+          return data;
+        } catch(e) { return { err: e.message }; }
+      }
+
+      function saveAuth(tk, rl) { token = tk; role = rl; localStorage.setItem("jmtoken", tk); localStorage.setItem("jmrole", rl); }
+
+      async function logoutUser() {
+        await req("/logout", { method: "POST" });
+        localStorage.clear(); token = ""; role = ""; currentUser = ""; currentAvatar = "";
+        if (ws) { ws.close(); ws = null; }
+        updateUI();
+      }
+
+      async function loadMe() {
+        const j = await req("/me");
+        if (j.user) { currentUser = j.user; currentAvatar = j.avatar || ""; role = j.role; localStorage.setItem("jmrole", role); }
+        else { currentUser = ""; currentAvatar = ""; if (!token) role = ""; }
+        updateUI();
+      }
+
+      function updateUI() {
+        const img = $("avatarImg"), ch = $("avatarChar"), uic = $("userInfoCard"), uit = $("userInfoText"), lp = $("livePill");
+        const tApi = $("tabApi"), tAdmin = $("tabAdmin"), tBot = $("tabBot"), tUptime = $("tabUptime");
+        if (currentUser) {
+          img.onerror = () => { img.style.display = "none"; ch.style.display = "flex"; };
+          if (currentAvatar) { img.src = currentAvatar; img.style.display = "block"; ch.style.display = "none"; }
+          else { img.style.display = "none"; ch.style.display = "flex"; ch.textContent = currentUser.charAt(0).toUpperCase(); }
+          uic.style.display = "block";
+          const roleLabel = role === "owner" ? "owner" : role === "admin" ? "admin" : "member";
+          const roleColor = role === "owner" ? "bg-red" : role === "admin" ? "bg-green" : "bg-dim";
+          uit.innerHTML = '<div class="irow"><span class="k">Nguoi dung</span><span class="v">' + currentUser + '</span></div>' +
+            '<div class="irow"><span class="k">Role</span><span class="v"><span class="badge ' + roleColor + '">' + roleLabel + '</span></span></div>';
+          lp.classList.add("show");
+          tApi.style.display = "flex"; tBot.style.display = "flex"; tUptime.style.display = "flex";
+          if (role === "owner" || role === "admin") tAdmin.style.display = "flex";
+          else tAdmin.style.display = "none";
+          setTimeout(() => { const a = document.querySelector(".tab-btn.active"); if (a) updateIndicator(a); }, 50);
+          connectChat();
+          const limitEl = $("botLimitInfo");
+          if (limitEl) {
+            if (role === "owner" || role === "admin") limitEl.innerHTML = '<div class="badge bg-green">Admin/Owner: Unlimited bots</div>';
+            else limitEl.innerHTML = '<div class="badge bg-yellow">Free user: 1 bot Discord</div>';
+          }
+        } else {
+          img.style.display = "none"; ch.style.display = "flex"; ch.textContent = "?";
+          uic.style.display = "none"; lp.classList.remove("show");
+          tApi.style.display = "none"; tAdmin.style.display = "none"; tBot.style.display = "none"; tUptime.style.display = "none";
+          if (ws) { ws.close(); ws = null; }
+          $("chatMessages").innerHTML = "";
+          if ([1,2,3,4].includes(currentTab)) goToTab(0);
+        }
+      }
+
+      window.registerUser = async function() {
+        const user = $("authUser").value.trim(), pass = $("authPass").value;
+        setOut("authStatus", JSON.stringify(await req("/register", { method: "POST", body: JSON.stringify({ user, pass }) }), null, 2));
+      };
+      window.loginUser = async function() {
+        const user = $("authUser").value.trim(), pass = $("authPass").value;
+        const j = await req("/login", { method: "POST", body: JSON.stringify({ user, pass }) });
+        if (j.token) { saveAuth(j.token, j.role); setOut("authStatus", "Dang nhap thanh cong!"); await loadMe(); goToTab(1); }
+        else setOut("authStatus", JSON.stringify(j, null, 2));
+      };
+      window.logoutUser = logoutUser;
+
+      window.createAPI = async function() {
+        const createBody = {
+          name: $("apiName").value.trim(), displayName: $("apiDisplay").value.trim(), webhook: $("apiWebhook").value.trim(),
+          privateMode: $("apiPrivate").value === "true", viewIP: $("apiViewIP").value.trim(),
+          whitelistIPs: $("apiWhitelist").value.split("\n").map(s => s.trim()).filter(Boolean)
+        };
+        const j = await req("/create", { method: "POST", body: JSON.stringify(createBody) });
+        if (!j.id) { setOut("apiCreateStatus", JSON.stringify(j, null, 2)); return; }
+        const sb = {
+          id: j.id, prefix: $("apiPrefix").value, suffix: $("apiSuffix").value,
+          maxJobsPerBoss: parseInt($("apiMaxBoss").value) || 0, maxTotalJobs: parseInt($("apiMaxTotal").value) || 0,
+          jobSort: $("apiSort").value, customFields: $("apiFields").value.split(",").map(s => s.trim()).filter(Boolean)
+        };
+        const wc = $("apiWebhookCustom").value.trim();
+        if (wc) { try { sb.webhookCustom = JSON.parse(wc); } catch(e) { setOut("apiCreateStatus", "Tao xong nhung custom webhook JSON khong hop le:\nID: " + j.id); loadMyAPIs(); return; } }
+        if (sb.prefix || sb.suffix || sb.maxJobsPerBoss || sb.maxTotalJobs || sb.customFields.length || wc) await req("/settings", { method: "POST", body: JSON.stringify(sb) });
+        setOut("apiCreateStatus", "Da tao thanh cong!\nID: " + j.id + "\nKey: " + j.apiKey + "\nLink: " + API_BASE + "/api/" + j.id + "/all");
+        loadMyAPIs();
+      };
+
+      window.loadMyAPIs = async function() {
+        const data = await req("/my"), div = $("myAPIs"); div.innerHTML = "";
+        if (!Array.isArray(data) || !data.length) { div.innerHTML = '<div class="out">Chua co API nao</div>'; return; }
+        data.forEach(api => {
+          const bossKeys = Object.keys(api.bosses || {});
+          const bossHtml = bossKeys.length ? bossKeys.map(b => '<span class="badge bg-green">' + b + ': ' + api.bosses[b] + '</span>').join(" ") : '<span class="badge bg-dim">Chua co boss</span>';
+          const el = document.createElement("div"); el.className = "api-item";
+          el.innerHTML =
+            '<div class="api-name">' + (api.displayName || api.name) + ' ' + (api.enabled ? '<span class="badge bg-green">ON</span>' : '<span class="badge bg-red">OFF</span>') + '</div>' +
+            '<div class="api-meta">ID: ' + api.id + ' | Jobs: ' + api.totalJobs + ' | Bosses: ' + bossKeys.length + '</div>' +
+            '<div style="margin-bottom:6px;display:flex;flex-wrap:wrap;gap:4px">' + bossHtml + '</div>' +
+            '<div class="api-key">Key: ' + api.apiKey + '</div>' +
+            '<div class="btn-row">' +
+              '<button class="btn btn-g" style="font-size:.62rem;padding:7px 8px" onclick="copyLink(\'' + api.id + '\')">Sao chep link</button>' +
+              '<button class="btn btn-g" style="font-size:.62rem;padding:7px 8px" onclick="renameAPI(\'' + api.id + '\')">Doi ten</button>' +
+              '<button class="btn btn-g" style="font-size:.62rem;padding:7px 8px" onclick="fillSettings(\'' + api.id + '\')">Cai dat</button>' +
+              '<button class="btn btn-d" style="font-size:.62rem;padding:7px 8px" onclick="deleteAPIById(\'' + api.id + '\')">Xoa</button>' +
+            '</div>';
+          div.appendChild(el);
+        });
+      };
+
+      window.copyLink = function(id) {
+        navigator.clipboard.writeText(API_BASE + "/api/" + id + "/all").then(() => alert("Da sao chep!")).catch(() => prompt("Link:", API_BASE + "/api/" + id + "/all"));
+      };
+
+      window.renameAPI = async function(id) {
+        const newName = prompt("Nhap ten hien thi moi cho API " + id + ":");
+        if (!newName || !newName.trim()) return;
+        const j = await req("/api/" + id + "/rename", { method: "PUT", body: JSON.stringify({ displayName: newName.trim() }) });
+        if (j.ok) loadMyAPIs(); else alert("Loi: " + (j.err || "khong the doi ten"));
+      };
+
+      window.fillSettings = async function(apiId) {
+        let api = null;
+        const od = await req("/owner");
+        if (od && od.apis && od.apis[apiId]) api = od.apis[apiId];
+        else { const apis = await req("/my"); api = Array.isArray(apis) ? apis.find(a => a.id === apiId) : null; }
+        if (!api) return;
+        $("setApiId").value = api.id; $("setDisplay").value = api.displayName || ""; $("setWebhook").value = api.webhook || "";
+        $("setTTL").value = (api.ttl || 60000) / 1000; $("setPrivate").value = api.privateMode ? "true" : "false";
+        $("setIP").value = api.viewIP || ""; $("setDup").value = api.removeDuplicate ? "true" : "false";
+        $("setEnabled").value = api.enabled !== false ? "true" : "false"; $("setSort").value = api.jobSort || "desc";
+        $("setPrefix").value = api.prefix || ""; $("setSuffix").value = api.suffix || "";
+        $("setMaxBoss").value = api.maxJobsPerBoss || 0; $("setMaxTotal").value = api.maxTotalJobs || 0;
+        $("setWhitelist").value = Array.isArray(api.whitelistIPs) ? api.whitelistIPs.join("\n") : "";
+        $("setFields").value = Array.isArray(api.customFields) ? api.customFields.join(", ") : "";
+        $("setWebhookCustom").value = api.webhookCustom ? JSON.stringify(api.webhookCustom, null, 2) : "";
+        $("setEncode").value = "";
+        goToTab(1); setTimeout(() => { const card = $("cardSetApi"); openCard(card); card?.scrollIntoView({ behavior: "smooth" }); }, 200);
+      };
+
+      window.saveAPISettings = async function() {
+        const body = {
+          id: $("setApiId").value.trim(), displayName: $("setDisplay").value, webhook: $("setWebhook").value,
+          ttl: Number($("setTTL").value) * 1000, privateMode: $("setPrivate").value === "true", viewIP: $("setIP").value,
+          removeDuplicate: $("setDup").value === "true", enabled: $("setEnabled").value === "true",
+          jobSort: $("setSort").value, prefix: $("setPrefix").value, suffix: $("setSuffix").value,
+          maxJobsPerBoss: parseInt($("setMaxBoss").value) || 0, maxTotalJobs: parseInt($("setMaxTotal").value) || 0,
+          whitelistIPs: $("setWhitelist").value.split("\n").map(s => s.trim()).filter(Boolean),
+          customFields: $("setFields").value.split(",").map(s => s.trim()).filter(Boolean)
+        };
+        const wc = $("setWebhookCustom").value.trim(); if (wc) { try { body.webhookCustom = JSON.parse(wc); } catch(e) { setOut("setStatus", "Custom webhook JSON khong hop le"); return; } }
+        const enc = $("setEncode").value.trim(); if (enc) body.encodeText = enc;
+        setOut("setStatus", JSON.stringify(await req("/settings", { method: "POST", body: JSON.stringify(body) }), null, 2));
+        loadMyAPIs();
+      };
+
+      window.loadViewAPI = async function() {
+        const id = $("viewId").value.trim(), boss = $("viewBoss").value.trim() || "all";
+        const r = await fetch("/api/" + id + "/" + boss + "?page=" + $("viewPage").value + "&limit=" + $("viewLimit").value + "&sort=" + $("viewSort").value + "&group=" + $("viewGroup").value);
+        setOut("viewOutput", JSON.stringify(await r.json(), null, 2));
+      };
+      window.deleteJob = async function() {
+        const id = $("mgrId").value.trim(), boss = $("mgrBoss").value.trim(), job = $("mgrJob").value.trim(), index = $("mgrIndex").value;
+        const body = { boss }; if (job) body.job = job; if (index !== "") body.index = parseInt(index);
+        setOut("mgrStatus", JSON.stringify(await req("/api/" + id + "/job", { method: "DELETE", body: JSON.stringify(body) }), null, 2));
+      };
+      window.clearBoss = async function() { setOut("mgrStatus", JSON.stringify(await req("/api/" + $("mgrId").value.trim() + "/clear", { method: "DELETE", body: JSON.stringify({ boss: $("mgrBoss").value.trim() }) }), null, 2)); };
+      window.clearAllBoss = async function() {
+        const id = $("mgrId").value.trim(); if (!confirm("Xoa tat ca jobs cua API " + id + "?")) return;
+        setOut("mgrStatus", JSON.stringify(await req("/api/" + id + "/clear", { method: "DELETE", body: JSON.stringify({}) }), null, 2));
+      };
+      window.deleteAPIById = async function(id) { if (!confirm("Xoa API " + id + "?")) return; const j = await req("/api/" + id, { method: "DELETE" }); if (j.ok) loadMyAPIs(); setOut("mgrStatus", JSON.stringify(j, null, 2)); };
+      window.deleteAPI = function() { deleteAPIById($("mgrId").value.trim()); };
+      window.loadStats = async function() { setOut("mgrStatus", JSON.stringify(await req("/api/" + $("mgrId").value.trim() + "/stats"), null, 2)); };
+      window.loadOwnerData = async function() { setOut("ownerDataOutput", JSON.stringify(await req("/owner"), null, 2)); };
+      window.cleanAllExpired = async function() { setOut("ownerDataOutput", JSON.stringify(await req("/owner/clean-all-expired", { method: "POST" }), null, 2)); };
+      window.loadOwnerStats = async function() { setOut("adminStats", JSON.stringify(await req("/owner/stats"), null, 2)); };
+      window.loadAdminUsers = async function() {
+        const j = await req("/admin/users"), div = $("adminUsersList");
+        if (!Array.isArray(j)) { div.innerHTML = '<div class="out">' + JSON.stringify(j) + '</div>'; return; }
+        div.innerHTML = j.map(u => '<div class="irow"><span class="k">' + u.username + '</span><span class="v"><span class="badge ' + (u.role === "owner" ? "bg-red" : u.role === "admin" ? "bg-green" : "bg-dim") + '">' + (u.role || "member") + '</span></span></div>').join("");
+      };
+      window.setUserRole = async function() {
+        const user = $("adminUser").value.trim(), rv = $("adminRole").value;
+        if (!user) { setOut("adminRoleStatus", "Thieu username"); return; }
+        const j = await req("/owner/set-role", { method: "POST", body: JSON.stringify({ user, role: rv }) }); setOut("adminRoleStatus", JSON.stringify(j, null, 2)); if (j.ok) loadAdminUsers();
+      };
+      window.loadGlobalSettings = async function() {
+        const j = await req("/owner/global-settings"); if (j.err) { setOut("gsStatus", JSON.stringify(j)); return; }
+        $("gsTTL").value = j.ttl / 1000; $("gsMaxBoss").value = j.maxJobsPerBoss; $("gsMaxTotal").value = j.maxTotalJobs;
+        $("gsPrefix").value = j.prefix; $("gsSuffix").value = j.suffix; $("gsSort").value = j.jobSort; $("gsDup").value = j.removeDuplicate ? "true" : "false";
+        $("gsEncode").value = j.encode ? JSON.stringify(j.encode) : ""; setOut("gsStatus", "Da tai global settings");
+      };
+      window.saveGlobalSettings = async function() {
+        const body = {
+          ttl: Number($("gsTTL").value) * 1000, maxJobsPerBoss: parseInt($("gsMaxBoss").value) || 0,
+          maxTotalJobs: parseInt($("gsMaxTotal").value) || 0, prefix: $("gsPrefix").value, suffix: $("gsSuffix").value,
+          jobSort: $("gsSort").value, removeDuplicate: $("gsDup").value === "true"
+        };
+        const enc = $("gsEncode").value.trim(); if (enc) body.encodeText = enc;
+        setOut("gsStatus", JSON.stringify(await req("/owner/global-settings", { method: "POST", body: JSON.stringify(body) }), null, 2));
+      };
+      window.resetAPIKey = async function() {
+        const id = $("resetKeyId").value.trim(); if (!id) { setOut("resetKeyStatus", "Nhap API ID"); return; }
+        if (!confirm("Reset key cho API " + id + "?")) return;
+        const j = await req("/owner/reset-api-key", { method: "POST", body: JSON.stringify({ id }) }); setOut("resetKeyStatus", JSON.stringify(j, null, 2)); if (j.ok) loadMyAPIs();
+      };
+      window.changeAPIOwner = async function() {
+        const id = $("changeOwnerId").value.trim(), nw = $("changeOwnerNew").value.trim();
+        if (!id || !nw) { setOut("changeOwnerStatus", "Nhap day du ID va owner moi"); return; }
+        setOut("changeOwnerStatus", JSON.stringify(await req("/owner/change-owner", { method: "POST", body: JSON.stringify({ id, newOwner: nw }) }), null, 2));
+      };
+
+      // Bot functions
+      window.createBot = async function() {
+        const name = $("botName").value.trim(), autoRestart = $("botAutoRestart").checked;
+        const fileEl = $("botFile"), codeEl = $("botCode").value, envRaw = $("botEnv").value;
+        if (!name) { setOut("botCreateMsg", "Nhap ten bot"); return; }
+        const fd = new FormData(); fd.append("name", name); fd.append("env", envRaw || "{}"); fd.append("autoRestart", autoRestart ? "true" : "false");
+        if (fileEl.files[0]) fd.append("file", fileEl.files[0]); else fd.append("code", codeEl);
+        const r = await fetch("/bot/create", { method: "POST", headers: { authorization: token }, body: fd });
+        const data = await r.json();
+        if (data.ok) { setOut("botCreateMsg", "Bot tao thanh cong! ID: " + data.id); loadBots(); }
+        else setOut("botCreateMsg", data.err || "Loi tao bot");
+      };
+
+      window.loadBots = async function() {
+        const bots = await req("/bot/my"), div = $("botList"); div.innerHTML = "";
+        if (!Array.isArray(bots) || !bots.length) { div.innerHTML = '<div class="out">Chua co bot nao. Tao bot moi o tren!</div>'; return; }
+        bots.forEach(b => {
+          const sc = b.status === "running" ? "bg-green" : b.status === "error" ? "bg-red" : b.status === "restarting" ? "bg-yellow" : "bg-dim";
+          const el = document.createElement("div"); el.className = "bot-item"; el.id = "bitem-" + b.id;
+          el.innerHTML = '<div class="bot-name">' + b.name + ' <span class="badge ' + sc + '">' + b.status + '</span>' + (b.autoRestart ? '<span class="badge bg-blue">auto-restart</span>' : '') + '</div>' +
+            '<div style="font-size:.65rem;color:var(--text-dim);margin-bottom:6px">ID: ' + b.id + ' | ENV: ' + (b.envKeys.join(", ") || "none") + '</div>' +
+            '<div class="log-area" id="log-' + b.id + '">Dang tai logs...</div>' +
+            '<div class="btn-row" style="margin-top:8px">' +
+              (b.status !== "running" && b.status !== "restarting" ? '<button class="btn btn-s" style="font-size:.65rem;padding:8px" onclick="startBot(\'' + b.id + '\')">▶ Start</button>' : '') +
+              (b.status === "running" ? '<button class="btn btn-v" style="font-size:.65rem;padding:8px" onclick="stopBot(\'' + b.id + '\')">■ Stop</button>' : '') +
+              '<button class="btn btn-g" style="font-size:.65rem;padding:8px" onclick="refreshLogs(\'' + b.id + '\')">↻ Logs</button>' +
+              '<button class="btn btn-g" style="font-size:.65rem;padding:8px" onclick="renameBot(\'' + b.id + '\')">✎ Ten</button>' +
+              '<button class="btn btn-d" style="font-size:.65rem;padding:8px" onclick="deleteBot(\'' + b.id + '\')">✕ Xoa</button>' +
+            '</div>';
+          div.appendChild(el);
+          refreshLogs(b.id);
+        });
+      };
+
+      window.startBot = async function(id) { await req("/bot/" + id + "/start", { method: "POST" }); setTimeout(loadBots, 800); };
+      window.stopBot = async function(id) { await req("/bot/" + id + "/stop", { method: "POST" }); setTimeout(loadBots, 800); };
+      window.deleteBot = async function(id) { if (!confirm("Xoa bot " + id + "?")) return; const j = await req("/bot/" + id, { method: "DELETE" }); if (j.ok) loadBots(); };
+      window.refreshLogs = async function(id) {
+        const r = await req("/bot/" + id + "/logs"), el = $("log-" + id);
+        if (el && r.logs) { el.textContent = r.logs.join("\n") || "No logs yet"; el.scrollTop = el.scrollHeight; }
+      };
+      window.renameBot = async function(id) {
+        const newName = prompt("Nhap ten moi cho bot " + id + ":");
+        if (!newName || !newName.trim()) return;
+        const j = await req("/bot/" + id + "/rename", { method: "PUT", body: JSON.stringify({ name: newName.trim() }) });
+        if (j.ok) loadBots(); else alert("Loi: " + (j.err || "khong the doi ten"));
+      };
+
+      // Monitor functions
+      window.createMonitor = async function() {
+        const name = $("monName").value.trim(), url = $("monUrl").value.trim(), interval = parseInt($("monInterval").value), webhook = $("monWebhook").value.trim();
+        if (!name || !url) { setOut("monCreateMsg", "Nhap ten va URL"); return; }
+        const j = await req("/monitor/create", { method: "POST", body: JSON.stringify({ name, url, interval, webhook }) });
+        if (j.ok) { setOut("monCreateMsg", "Da them monitor!"); loadMonitors(); } else setOut("monCreateMsg", j.err || "Loi");
+      };
+
+      window.loadMonitors = async function() {
+        const monitors = await req("/monitor/my"), div = $("monList"); div.innerHTML = "";
+        if (!Array.isArray(monitors) || !monitors.length) { div.innerHTML = '<div class="out">Chua co monitor nao</div>'; return; }
+        monitors.forEach(m => {
+          const hist = (m.history || []).slice(-40);
+          const bars = hist.map(h => '<div class="hbar-dot h-' + (h.s === "on" ? "on" : "off") + '" title="' + (h.s === "on" ? "Online" : "Offline") + ' | Ping: ' + (h.p || 0) + 'ms"></div>').join("");
+          const sc = m.lastStatus === "online" ? "bg-green" : m.lastStatus === "offline" ? "bg-red" : "bg-dim";
+          const el = document.createElement("div"); el.className = "mon-item";
+          el.innerHTML = '<div class="mon-name">' + m.name + ' <span class="badge ' + sc + '">' + (m.lastStatus || "waiting") + '</span></div>' +
+            '<div class="mon-url">' + m.url + '</div>' +
+            '<div class="mon-stats"><div><div class="mon-stat-val" style="color:var(--accent)">' + (m.uptime || "0.00") + "%</div><div class='mon-stat-lbl'>Uptime</div></div>" +
+            "<div><div class='mon-stat-val' style='color:var(--cyan)'>" + (m.lastPing || 0) + "ms</div><div class='mon-stat-lbl'>Ping</div></div>" +
+            "<div><div class='mon-stat-val' style='color:var(--purple)'>" + (m.lastCode || "-") + "</div><div class='mon-stat-lbl'>HTTP</div></div></div>" +
+            '<div class="hbar">' + (bars || '<span style="color:var(--text-dim);font-size:.65rem">Chua co du lieu</span>') + '</div>' +
+            (m.lastError ? '<div style="font-size:.65rem;color:var(--red);margin-top:4px">' + m.lastError + '</div>' : '') +
+            '<div class="btn-row" style="margin-top:8px"><button class="btn btn-d" style="font-size:.65rem;padding:8px" onclick="deleteMonitor(\'' + m.id + '\')">✕ Xoa</button><button class="btn btn-g" style="font-size:.65rem;padding:8px" onclick="renameMonitor(\'' + m.id + '\')">✎ Ten</button></div>';
+          div.appendChild(el);
+        });
+      };
+
+      window.deleteMonitor = async function(id) { if (!confirm("Xoa monitor " + id + "?")) return; const j = await req("/monitor/" + id, { method: "DELETE" }); if (j.ok) loadMonitors(); };
+      window.renameMonitor = async function(id) {
+        const newName = prompt("Nhap ten moi cho monitor " + id + ":");
+        if (!newName || !newName.trim()) return;
+        const j = await req("/monitor/" + id + "/rename", { method: "PUT", body: JSON.stringify({ name: newName.trim() }) });
+        if (j.ok) loadMonitors(); else alert("Loi: " + (j.err || "khong the doi ten"));
+      };
+
+      function connectChat() {
+        if (!token || !currentUser) return;
+        if (ws && ws.readyState === WebSocket.OPEN) return;
+        const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+        ws = new WebSocket(protocol + "//" + location.host + "/ws?token=" + token);
+        ws.onmessage = function(e) {
+          try {
+            const msg = JSON.parse(e.data);
+            if (msg.type === "history") { $("chatMessages").innerHTML = ""; msg.messages.forEach(addMsg); }
+            else if (msg.type === "msg") addMsg(msg);
+          } catch {}
+        };
+        ws.onclose = function() { ws = null; };
+      }
+
+      function addMsg(msg) {
+        const container = $("chatMessages"), div = document.createElement("div"); div.className = "cmsg";
+        const avHtml = msg.avatar ? '<div class="cav"><img src="' + msg.avatar + '" alt="" onerror="this.parentNode.textContent=\'' + (msg.user || "?").charAt(0).toUpperCase() + '\'"></div>' : '<div class="cav">' + (msg.user || "?").charAt(0).toUpperCase() + '</div>';
+        div.innerHTML = avHtml + '<div class="cbw"><div class="cname">' + (msg.user || "unknown") + '</div><div class="cbbl">' + escHtml(msg.content || "") + '</div></div>';
+        container.appendChild(div); container.scrollTop = container.scrollHeight;
+      }
+      function escHtml(s) { return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+      function sendChatMessage() {
+        const input = $("chatInput"), content = input.value.trim(); if (!content) return;
+        if (!ws || ws.readyState !== WebSocket.OPEN) { connectChat(); setTimeout(() => { if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "msg", content })); }, 800); input.value = ""; return; }
+        ws.send(JSON.stringify({ type: "msg", content })); input.value = "";
+      }
+      window.sendChatMessage = sendChatMessage;
+      $("chatSendBtn").addEventListener("click", sendChatMessage);
+      $("chatInput").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChatMessage(); } });
+
+      $("avatarBtn").addEventListener("click", () => {
+        if (!currentUser) { alert("Vui long dang nhap truoc!"); return; }
+        $("modalUsername").value = currentUser; $("modalAvatar").value = currentAvatar; $("modalNewPass").value = ""; $("modalOldPass").value = "";
+        $("modalStatus").style.display = "none"; $("settingsModal").classList.remove("hidden");
+      });
+      window.closeModal = function() { $("settingsModal").classList.add("hidden"); };
+      $("settingsModal").addEventListener("click", e => { if (e.target === $("settingsModal")) closeModal(); });
+
+      window.saveProfile = async function() {
+        const newName = $("modalUsername").value.trim(), newAvatar = $("modalAvatar").value.trim(), newPass = $("modalNewPass").value, oldPass = $("modalOldPass").value;
+        if (!newName) { setOut("modalStatus", "Ten khong duoc de trong"); return; }
+        if (newAvatar && newAvatar !== currentAvatar) { const j = await req("/set-avatar", { method: "POST", body: JSON.stringify({ avatar: newAvatar }) }); if (j.ok) currentAvatar = newAvatar; else { setOut("modalStatus", JSON.stringify(j)); return; } }
+        if (newPass) { if (newPass.length < 8) { setOut("modalStatus", "Mat khau toi thieu 8 ky tu"); return; } const j = await req("/change-password", { method: "POST", body: JSON.stringify({ oldPass, newPass }) }); if (!j.ok) { setOut("modalStatus", JSON.stringify(j)); return; } }
+        setOut("modalStatus", "Da cap nhat ho so!"); await loadMe(); setTimeout(closeModal, 1200);
+      };
+
+      const canvas = $("stars"), ctx = canvas.getContext("2d"); let W, H;
+      function resizeCanvas() { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
+      resizeCanvas(); window.addEventListener("resize", resizeCanvas);
+      const stars = Array.from({ length: 100 }, () => ({ x: Math.random() * (window.innerWidth || 400), y: Math.random() * (window.innerHeight || 800), r: Math.random() * 1.4 + 0.2, vx: (Math.random() - 0.5) * 0.1, vy: -(Math.random() * 0.25 + 0.04), phase: Math.random() * Math.PI * 2, spd: Math.random() * 0.02 + 0.008 }));
+      function drawStars() { ctx.clearRect(0, 0, W, H); for (let i = 0; i < stars.length; i++) { const s = stars[i]; s.x += s.vx; s.y += s.vy; s.phase += s.spd; if (s.y < -2) { s.y = H + 2; s.x = Math.random() * W; } if (s.x < -2) s.x = W + 2; if (s.x > W + 2) s.x = -2; const a = (Math.sin(s.phase) * 0.3 + 0.5) * 0.65; ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2); ctx.fillStyle = "rgba(200,220,255," + a + ")"; ctx.fill(); } requestAnimationFrame(drawStars); }
+      drawStars();
+
+      setInterval(() => {
+        if (currentTab === 3) document.querySelectorAll('[id^="log-"]').forEach(el => { const id = el.id.replace("log-", ""); refreshLogs(id); });
+        if (currentTab === 4) loadMonitors();
+      }, 12000);
+
+      setTimeout(() => { const a = document.querySelector(".tab-btn.active"); if (a) updateIndicator(a); }, 80);
+      (async function() { await loadMe(); if (token) loadMyAPIs(); })();
+    })();
+  </script>
+</body>
+</html>
