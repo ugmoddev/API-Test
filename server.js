@@ -1,4 +1,3 @@
-//https://pastefy.app/X3Wd8lg1/raw
 const express = require("express")
 const crypto = require("crypto")
 const compression = require("compression")
@@ -57,7 +56,7 @@ const globalDefaults = {
 }
 
 // ========================================================
-// ============ OBFUSCATE & DEOBFUSCATE ============
+// ============ OBFUSCATE & DEOBFUSCATE (RATE 100%) ============
 // ========================================================
 
 const OBF_MAP = {
@@ -107,12 +106,12 @@ function rand(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-function obfuscate(text, obfuscateRate) {
+// Obfuscate 100% tất cả ký tự
+function obfuscate(text) {
   if (!text || typeof text !== "string") {
     return { obfuscated: text, originalLength: 0, obfuscatedLength: 0, obfCount: 0 };
   }
 
-  const rate = Math.min(1, Math.max(0, (obfuscateRate || 40) / 100));
   const chars = text.split('');
   let result = [];
   let obfCount = 0;
@@ -121,7 +120,7 @@ function obfuscate(text, obfuscateRate) {
   for (let i = 0; i < chars.length; i++) {
     const ch = chars[i];
     const lower = ch.toLowerCase();
-    if (OBF_MAP[lower] && Math.random() < rate) {
+    if (OBF_MAP[lower]) {
       const tok = rand(OBF_MAP[lower]);
       result.push(tok);
       obfCount++;
@@ -727,7 +726,7 @@ app.get("/my", (req, res) => {
 })
 
 // ========================================================
-// ============ PUSH ENDPOINTS WITH OBFUSCATE ============
+// ============ PUSH ENDPOINTS WITH OBFUSCATE 100% ============
 // ========================================================
 
 app.post("/push", async (req, res) => {
@@ -740,10 +739,9 @@ app.post("/push", async (req, res) => {
     if (!boss) return res.json({ err: "thieu boss" })
     boss = String(boss).toLowerCase().trim()
     
-    // Obfuscate job với tỷ lệ 40%
+    // Obfuscate 100% tất cả ký tự
     const originalJob = job;
-    const obfuscateRate = 40;
-    const obfResult = obfuscate(job, obfuscateRate);
+    const obfResult = obfuscate(job);
     job = obfResult.obfuscated;
     
     let finalJob = encode(job, api.encode)
@@ -764,7 +762,7 @@ app.post("/push", async (req, res) => {
         obfuscated: finalJob,
         obfCount: obfResult.obfCount,
         totalChars: obfResult.originalLength,
-        rate: Math.round(obfResult.obfCount / obfResult.originalLength * 100) + '%'
+        rate: '100%'
     })
 })
 
@@ -777,16 +775,15 @@ app.post("/push/bulk", async (req, res) => {
     if (!Array.isArray(jobs) || !jobs.length) return res.json({ err: "mang jobs rong" })
     let added = 0, dup = toBool(api.removeDuplicate)
     const obfuscatedJobs = [];
-    const obfuscateRate = 40;
     
     for (let item of jobs) {
         let { job, players, sea, boss } = item
         if (!job || !boss) continue
         boss = String(boss).toLowerCase().trim()
         
-        // Obfuscate job
+        // Obfuscate 100%
         const originalJob = job;
-        const obfResult = obfuscate(job, obfuscateRate);
+        const obfResult = obfuscate(job);
         job = obfResult.obfuscated;
         
         let finalJob = encode(job, api.encode)
@@ -808,7 +805,7 @@ app.post("/push/bulk", async (req, res) => {
         ok: 1, 
         added, 
         obfuscated: obfuscatedJobs,
-        rate: Math.round(obfuscateRate) + '%'
+        rate: '100%'
     })
 })
 
