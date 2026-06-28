@@ -55,95 +55,237 @@ const globalDefaults = {
     jobSort: "desc", customFields: null, webhookCustom: null
 }
 
-// ============ OBFUSCATE MAP ============
+// ========================================================
+// ============ OBFUSCATE & DEOBFUSCATE ============
+// ========================================================
+
 const OBF_MAP = {
-  ["-"]: ["52ksm9rewu","egfcxjy93r","zpp5zcx3b9"],
-  ["a"]: ["fk9nl3c2yx","r4oeld1z4k","xxo4cu3zoy"],
-  ["b"]: ["vz4l5n7jdn","llbpdpfi7y","vdfdsnjg54"],
-  ["c"]: ["niwycc4xg9","yb88zycsuw","vx97ztr067"],
-  ["d"]: ["lsykl6foig","miickerter","8adrppd9a8"],
-  ["e"]: ["6v9fcwbuir","7k6dxtjmzo","aac1a1qlzw"],
-  ["f"]: ["lwi4aaj85o","1ny0ghyu9y","fy634ffq04"],
-  ["g"]: ["zrjhe7vjqy","3npqhzlqdq","d1ofdr1ipw"],
-  ["h"]: ["9zeggq80xz","7n6w394kqh","b4bbic1sb5"],
-  ["i"]: ["kjrbs0hhow","kn0q78m7ib","ibw9tuwe0y"],
-  ["j"]: ["st5utpal2g","9pqmx4u152","1j5ebke6jk"],
-  ["k"]: ["aehp5z5mke","y1tpi6dgri","9zdz5oe7n5"],
-  ["l"]: ["155rwoknf8","riifpcq3wf","223mbemdr2"],
-  ["m"]: ["6ppjzjgkf0","t1opvulusg","84chxs5qcs"],
-  ["n"]: ["jlxio0shmk","927wfa4loh","ntp928s12h"],
-  ["o"]: ["oq3gai08gv","hn8lq3q31e","wl0icq5q2y"],
-  ["p"]: ["kqq0jxt06w","cibrx3nvvy","3n9rwivyq8"],
-  ["q"]: ["jm520vu775","67afm33wm7","dy22hdk4gw"],
-  ["r"]: ["323te9yvvc","r50plyo0xo","awm1os6xdn"],
-  ["s"]: ["cpgbelxz56","0p4x9k18ev","pjz4hba7em"],
-  ["t"]: ["shhi0hbg1p","47mvh9ro5x","fu467hkw5w"],
-  ["u"]: ["mk987laxwk","4wnwdmrek7","01qy303j8k"],
-  ["v"]: ["opo1ccigg8","xz7yd00a1q","rdmvkpkzll"],
-  ["w"]: ["q23ws3q6gt","se8ftbcurn","d6cap2ry6u"],
-  ["x"]: ["og3c2qbi5k","hh1oql23wc","2dyabha8t7"],
-  ["y"]: ["cbewtbgzni","60lh91d9no","289uqhnpqy"],
-  ["z"]: ["18y01i005s","3athz7i4kj","ca8kysiy9e"],
-  ["1"]: ["pj88iemtk1","vgo4gvjawz","a0bjjr8qkz"],
-  ["2"]: ["9vkhoc2y0g","ukuotgty18","i2mqadcf1e"],
-  ["3"]: ["4hshzqf5i9","2dizfatmq7","uqcmt5jmkg"],
-  ["4"]: ["nfinmcik1z","ibn3l4p0ug","zjlgojs4zb"],
-  ["5"]: ["pmfxl1wmup","wm14sseeux","qu68htce7e"],
-  ["6"]: ["vqfrro63ur","rcokm0krau","zq6bi86dhu"],
-  ["7"]: ["9kf8jj5nvk","8p7b9wishd","ri12y0jiij"],
-  ["8"]: ["i02rerwqlc","onxkobv22q","lcb169bym0"],
-  ["9"]: ["duj0qrdrol","ilzhilsns5","hrmu7cj5ht"],
-  ["0"]: ["r3u27hxyr3","sd5ipflgyh","l9v6f3ef7f"],
+  ["-"]: ["52ksm9rewu", "egfcxjy93r", "zpp5zcx3b9"],
+  ["a"]: ["fk9nl3c2yx", "r4oeld1z4k", "xxo4cu3zoy"],
+  ["b"]: ["vz4l5n7jdn", "llbpdpfi7y", "vdfdsnjg54"],
+  ["c"]: ["niwycc4xg9", "yb88zycsuw", "vx97ztr067"],
+  ["d"]: ["lsykl6foig", "miickerter", "8adrppd9a8"],
+  ["e"]: ["6v9fcwbuir", "7k6dxtjmzo", "aac1a1qlzw"],
+  ["f"]: ["lwi4aaj85o", "1ny0ghyu9y", "fy634ffq04"],
+  ["g"]: ["zrjhe7vjqy", "3npqhzlqdq", "d1ofdr1ipw"],
+  ["h"]: ["9zeggq80xz", "7n6w394kqh", "b4bbic1sb5"],
+  ["i"]: ["kjrbs0hhow", "kn0q78m7ib", "ibw9tuwe0y"],
+  ["j"]: ["st5utpal2g", "9pqmx4u152", "1j5ebke6jk"],
+  ["k"]: ["aehp5z5mke", "y1tpi6dgri", "9zdz5oe7n5"],
+  ["l"]: ["155rwoknf8", "riifpcq3wf", "223mbemdr2"],
+  ["m"]: ["6ppjzjgkf0", "t1opvulusg", "84chxs5qcs"],
+  ["n"]: ["jlxio0shmk", "927wfa4loh", "ntp928s12h"],
+  ["o"]: ["oq3gai08gv", "hn8lq3q31e", "wl0icq5q2y"],
+  ["p"]: ["kqq0jxt06w", "cibrx3nvvy", "3n9rwivyq8"],
+  ["q"]: ["jm520vu775", "67afm33wm7", "dy22hdk4gw"],
+  ["r"]: ["323te9yvvc", "r50plyo0xo", "awm1os6xdn"],
+  ["s"]: ["cpgbelxz56", "0p4x9k18ev", "pjz4hba7em"],
+  ["t"]: ["shhi0hbg1p", "47mvh9ro5x", "fu467hkw5w"],
+  ["u"]: ["mk987laxwk", "4wnwdmrek7", "01qy303j8k"],
+  ["v"]: ["opo1ccigg8", "xz7yd00a1q", "rdmvkpkzll"],
+  ["w"]: ["q23ws3q6gt", "se8ftbcurn", "d6cap2ry6u"],
+  ["x"]: ["og3c2qbi5k", "hh1oql23wc", "2dyabha8t7"],
+  ["y"]: ["cbewtbgzni", "60lh91d9no", "289uqhnpqy"],
+  ["z"]: ["18y01i005s", "3athz7i4kj", "ca8kysiy9e"],
+  ["1"]: ["pj88iemtk1", "vgo4gvjawz", "a0bjjr8qkz"],
+  ["2"]: ["9vkhoc2y0g", "ukuotgty18", "i2mqadcf1e"],
+  ["3"]: ["4hshzqf5i9", "2dizfatmq7", "uqcmt5jmkg"],
+  ["4"]: ["nfinmcik1z", "ibn3l4p0ug", "zjlgojs4zb"],
+  ["5"]: ["pmfxl1wmup", "wm14sseeux", "qu68htce7e"],
+  ["6"]: ["vqfrro63ur", "rcokm0krau", "zq6bi86dhu"],
+  ["7"]: ["9kf8jj5nvk", "8p7b9wishd", "ri12y0jiij"],
+  ["8"]: ["i02rerwqlc", "onxkobv22q", "lcb169bym0"],
+  ["9"]: ["duj0qrdrol", "ilzhilsns5", "hrmu7cj5ht"],
+  ["0"]: ["r3u27hxyr3", "sd5ipflgyh", "l9v6f3ef7f"],
 };
 
-const NOISE_CHARS = ["!", "@", "#", "$", "%", "^", "&", "*", "(", ")"];
+const SPECIAL_PREFIXES = ["X", "Z", "Q", "K", "V", "W", "Y", "M", "P", "R"];
+const SPECIAL_SUFFIXES = ["x9", "k7", "v3", "m4", "p8", "r2", "w5", "y6", "z1", "q0"];
 
-function randNoise() {
-  return NOISE_CHARS[Math.floor(Math.random() * NOISE_CHARS.length)];
+function rand(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
 }
 
-function injectNoise(tok) {
-  const chars = [];
-  for (let i = 0; i < tok.length; i++) {
-    chars.push(tok[i]);
-    if (Math.random() < 0.35) {
-      chars.push(randNoise());
-    }
+function obfuscate(text, obfuscateRate) {
+  if (!text || typeof text !== "string") {
+    return { obfuscated: text, originalLength: 0, obfuscatedLength: 0, obfCount: 0 };
   }
-  let result = chars.join("");
-  
-  let count = 0;
-  for (const ch of result) {
-    if (NOISE_CHARS.includes(ch)) count++;
-  }
-  while (count < 2) {
-    const pos = Math.floor(Math.random() * (result.length + 1));
-    result = result.slice(0, pos) + randNoise() + result.slice(pos);
-    count++;
-  }
-  return result;
-}
 
-function obfuscate(text) {
-  if (!text || typeof text !== "string") return text;
-  
-  const lower = text.toLowerCase();
-  let result = "";
-  
-  for (let i = 0; i < lower.length; i++) {
-    const ch = lower[i];
-    if (OBF_MAP[ch]) {
-      const toks = OBF_MAP[ch];
-      const tok = toks[Math.floor(Math.random() * toks.length)];
-      result += injectNoise(tok);
+  const rate = Math.min(1, Math.max(0, (obfuscateRate || 40) / 100));
+  const chars = text.split('');
+  let result = [];
+  let obfCount = 0;
+  let obfMap = [];
+
+  for (let i = 0; i < chars.length; i++) {
+    const ch = chars[i];
+    const lower = ch.toLowerCase();
+    if (OBF_MAP[lower] && Math.random() < rate) {
+      const tok = rand(OBF_MAP[lower]);
+      result.push(tok);
+      obfCount++;
+      obfMap.push({ 
+        pos: result.length - 1, 
+        token: tok, 
+        char: ch,
+        index: i
+      });
     } else {
-      result += ch;
+      result.push(ch);
     }
   }
-  
-  return "AuraHub|" + result;
+
+  const obfText = result.join('');
+  const mapJson = JSON.stringify(obfMap);
+  const combined = obfText + '|MAP|' + mapJson;
+
+  const prefix = rand(SPECIAL_PREFIXES);
+  const suffix = rand(SPECIAL_SUFFIXES);
+  const finalWithMeta = prefix + "|" + combined + "|" + suffix;
+
+  let encoded = "";
+  for (let i = 0; i < finalWithMeta.length; i++) {
+    encoded += String.fromCharCode(255 - finalWithMeta.charCodeAt(i));
+  }
+
+  return {
+    obfuscated: "AuraHub|" + encoded,
+    originalLength: text.length,
+    obfuscatedLength: ("AuraHub|" + encoded).length,
+    obfCount: obfCount,
+    map: obfMap
+  };
 }
-// ========================================
+
+function isObfuscated(text) {
+  return text && typeof text === "string" && text.startsWith("AuraHub|");
+}
+
+function deobfuscate(text) {
+  if (!text || typeof text !== "string") {
+    return { result: text, valid: false };
+  }
+
+  if (!isObfuscated(text)) {
+    return { result: text, valid: false };
+  }
+
+  try {
+    let decoded = text.replace("AuraHub|", "");
+
+    let temp = "";
+    for (let i = 0; i < decoded.length; i++) {
+      temp += String.fromCharCode(255 - decoded.charCodeAt(i));
+    }
+    decoded = temp;
+
+    let foundPrefix = false;
+    for (const prefix of SPECIAL_PREFIXES) {
+      if (decoded.startsWith(prefix + "|")) {
+        decoded = decoded.slice(prefix.length + 1);
+        foundPrefix = true;
+        break;
+      }
+    }
+    if (!foundPrefix) {
+      for (const prefix of SPECIAL_PREFIXES) {
+        if (decoded.startsWith(prefix)) {
+          decoded = decoded.slice(prefix.length + 1);
+          break;
+        }
+      }
+    }
+
+    let foundSuffix = false;
+    for (const suffix of SPECIAL_SUFFIXES) {
+      if (decoded.endsWith("|" + suffix)) {
+        decoded = decoded.slice(0, decoded.length - suffix.length - 1);
+        foundSuffix = true;
+        break;
+      }
+    }
+    if (!foundSuffix) {
+      for (const suffix of SPECIAL_SUFFIXES) {
+        if (decoded.endsWith(suffix)) {
+          decoded = decoded.slice(0, decoded.length - suffix.length);
+          break;
+        }
+      }
+    }
+
+    let obfText = "";
+    let obfMap = [];
+    const mapMarker = "|MAP|";
+    const markerIndex = decoded.indexOf(mapMarker);
+    
+    if (markerIndex !== -1) {
+      obfText = decoded.slice(0, markerIndex);
+      const mapStr = decoded.slice(markerIndex + mapMarker.length);
+      try {
+        obfMap = JSON.parse(mapStr);
+      } catch (e) {
+        obfMap = [];
+      }
+    } else {
+      obfText = decoded;
+    }
+
+    let result = "";
+    if (obfMap && obfMap.length > 0) {
+      const parts = [];
+      let textPos = 0;
+      
+      obfMap.sort((a, b) => a.index - b.index);
+      
+      for (const item of obfMap) {
+        const tokenStart = obfText.indexOf(item.token, textPos);
+        if (tokenStart !== -1) {
+          if (textPos < tokenStart) {
+            parts.push(obfText.slice(textPos, tokenStart));
+          }
+          parts.push(item.char);
+          textPos = tokenStart + item.token.length;
+        }
+      }
+      if (textPos < obfText.length) {
+        parts.push(obfText.slice(textPos));
+      }
+      result = parts.join('');
+    } else {
+      let i = 0;
+      let maxIter = 500;
+      let iterations = 0;
+      while (i < obfText.length && iterations < maxIter) {
+        iterations++;
+        let found = false;
+        for (let len = 10; len >= 1 && !found; len--) {
+          if (i + len > obfText.length) continue;
+          const substr = obfText.slice(i, i + len);
+          for (const key in OBF_MAP) {
+            if (OBF_MAP[key].includes(substr)) {
+              result += key;
+              i += len;
+              found = true;
+              break;
+            }
+          }
+        }
+        if (!found) {
+          result += obfText[i];
+          i++;
+        }
+      }
+    }
+
+    return { result, valid: true };
+  } catch (e) {
+    return { result: text, valid: false };
+  }
+}
+
+// ========================================================
+// ============ END OBFUSCATE & DEOBFUSCATE ============
+// ========================================================
 
 function encrypt(text) {
     if (!ENCRYPTION_KEY) return text
@@ -583,6 +725,10 @@ app.get("/my", (req, res) => {
     }))
 })
 
+// ========================================================
+// ============ PUSH ENDPOINTS WITH OBFUSCATE ============
+// ========================================================
+
 app.post("/push", async (req, res) => {
     let { id, apiKey, job, players, sea, boss } = req.body
     let api = DB.apis[id]
@@ -593,9 +739,11 @@ app.post("/push", async (req, res) => {
     if (!boss) return res.json({ err: "thieu boss" })
     boss = String(boss).toLowerCase().trim()
     
-    // Obfuscate job
+    // Obfuscate job với tỷ lệ 40%
     const originalJob = job;
-    job = obfuscate(job);
+    const obfuscateRate = 40;
+    const obfResult = obfuscate(job, obfuscateRate);
+    job = obfResult.obfuscated;
     
     let finalJob = encode(job, api.encode)
     if (api.prefix) finalJob = api.prefix + finalJob
@@ -608,7 +756,15 @@ app.post("/push", async (req, res) => {
     let data = { job: finalJob, players: Number(players) || 0, sea: Number(sea) || 0, boss, t: now() }
     api.jobs[boss].push(data); applyJobLimits(api)
     if (api.webhook) sendWebhook(api.webhook, data, api.webhookCustom)
-    await saveDB(); res.json({ ok: 1, original: originalJob, obfuscated: finalJob })
+    await saveDB(); 
+    res.json({ 
+        ok: 1, 
+        original: originalJob, 
+        obfuscated: finalJob,
+        obfCount: obfResult.obfCount,
+        totalChars: obfResult.originalLength,
+        rate: Math.round(obfResult.obfCount / obfResult.originalLength * 100) + '%'
+    })
 })
 
 app.post("/push/bulk", async (req, res) => {
@@ -620,6 +776,8 @@ app.post("/push/bulk", async (req, res) => {
     if (!Array.isArray(jobs) || !jobs.length) return res.json({ err: "mang jobs rong" })
     let added = 0, dup = toBool(api.removeDuplicate)
     const obfuscatedJobs = [];
+    const obfuscateRate = 40;
+    
     for (let item of jobs) {
         let { job, players, sea, boss } = item
         if (!job || !boss) continue
@@ -627,7 +785,8 @@ app.post("/push/bulk", async (req, res) => {
         
         // Obfuscate job
         const originalJob = job;
-        job = obfuscate(job);
+        const obfResult = obfuscate(job, obfuscateRate);
+        job = obfResult.obfuscated;
         
         let finalJob = encode(job, api.encode)
         if (api.prefix) finalJob = api.prefix + finalJob
@@ -636,11 +795,25 @@ app.post("/push/bulk", async (req, res) => {
         if (dup) { let ex = api.jobs[boss].find(j => j.job === finalJob); if (ex) { ex.players = Number(players) || 0; ex.sea = Number(sea) || 0; ex.t = now(); added++; continue } }
         api.jobs[boss].push({ job: finalJob, players: Number(players) || 0, sea: Number(sea) || 0, boss, t: now() })
         added++
-        obfuscatedJobs.push({ original: originalJob, obfuscated: finalJob });
+        obfuscatedJobs.push({ 
+            original: originalJob, 
+            obfuscated: finalJob,
+            obfCount: obfResult.obfCount
+        });
         if (api.webhook) sendWebhook(api.webhook, { job: finalJob, players, sea, boss }, api.webhookCustom)
     }
-    applyJobLimits(api); await saveDB(); res.json({ ok: 1, added, obfuscated: obfuscatedJobs })
+    applyJobLimits(api); await saveDB(); 
+    res.json({ 
+        ok: 1, 
+        added, 
+        obfuscated: obfuscatedJobs,
+        rate: Math.round(obfuscateRate) + '%'
+    })
 })
+
+// ========================================================
+// ============ END PUSH ENDPOINTS ============
+// ========================================================
 
 const checkView = (req, api) => {
     if (!api.privateMode) return true
