@@ -55,10 +55,7 @@ const globalDefaults = {
     jobSort: "desc", customFields: null, webhookCustom: null
 }
 
-// ========================================================
-// ============ OBFUSCATE COMPLEX ============
-// ========================================================
-
+// ============ OBFUSCATE MAP ============
 const OBF_MAP = {
   ["-"]: ["52ksm9rewu","egfcxjy93r","zpp5zcx3b9"],
   ["a"]: ["fk9nl3c2yx","r4oeld1z4k","xxo4cu3zoy"],
@@ -99,24 +96,10 @@ const OBF_MAP = {
   ["0"]: ["r3u27hxyr3","sd5ipflgyh","l9v6f3ef7f"],
 };
 
-const NOISE_CHARS = ["!", "@", "#", "$", "%", "^", "&", "*", "(", ")", "~", "`", "|", "\\", "/", "?", "<", ">", "[", "]", "{", "}", ";", ":", "'", '"', ",", "."];
-const SPECIAL_PREFIXES = ["X", "Z", "Q", "K", "V", "W", "Y", "M", "P", "R"];
-const SPECIAL_SUFFIXES = ["x9", "k7", "v3", "m4", "p8", "r2", "w5", "y6", "z1", "q0"];
+const NOISE_CHARS = ["!", "@", "#", "$", "%", "^", "&", "*", "(", ")"];
 
 function randNoise() {
   return NOISE_CHARS[Math.floor(Math.random() * NOISE_CHARS.length)];
-}
-
-function randPrefix() {
-  return SPECIAL_PREFIXES[Math.floor(Math.random() * SPECIAL_PREFIXES.length)];
-}
-
-function randSuffix() {
-  return SPECIAL_SUFFIXES[Math.floor(Math.random() * SPECIAL_SUFFIXES.length)];
-}
-
-function randBetween(min, max) {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
 function injectNoise(tok) {
@@ -125,9 +108,6 @@ function injectNoise(tok) {
     chars.push(tok[i]);
     if (Math.random() < 0.35) {
       chars.push(randNoise());
-    }
-    if (Math.random() < 0.15) {
-      chars.push(tok[i].toUpperCase());
     }
   }
   let result = chars.join("");
@@ -144,63 +124,6 @@ function injectNoise(tok) {
   return result;
 }
 
-function reverseChunks(str) {
-  const chunkSize = randBetween(2, 4);
-  const chunks = [];
-  for (let i = 0; i < str.length; i += chunkSize) {
-    chunks.push(str.slice(i, i + chunkSize));
-  }
-  if (Math.random() < 0.3) {
-    chunks.reverse();
-  }
-  return chunks.join("");
-}
-
-function shuffleChars(str) {
-  const arr = str.split("");
-  for (let i = 0; i < arr.length; i++) {
-    if (Math.random() < 0.1) {
-      const j = Math.floor(Math.random() * arr.length);
-      [arr[i], arr[j]] = [arr[j], arr[i]];
-    }
-  }
-  return arr.join("");
-}
-
-function insertDummy(str) {
-  const dummyChars = ["_", "-", ".", "~"];
-  const positions = [];
-  for (let i = 0; i < str.length; i++) {
-    if (Math.random() < 0.08) {
-      positions.push(i);
-    }
-  }
-  let result = str;
-  for (let i = positions.length - 1; i >= 0; i--) {
-    const pos = positions[i];
-    const dummy = dummyChars[Math.floor(Math.random() * dummyChars.length)];
-    result = result.slice(0, pos + 1) + dummy + result.slice(pos + 1);
-  }
-  return result;
-}
-
-function applyMappingWithOffset(str) {
-  const chars = str.split("");
-  for (let i = 0; i < chars.length; i++) {
-    if (Math.random() < 0.2) {
-      const charCode = chars[i].charCodeAt(0);
-      const offset = randBetween(-3, 3);
-      if (offset !== 0) {
-        const newChar = String.fromCharCode(charCode + offset);
-        if (newChar.match(/[a-zA-Z0-9]/)) {
-          chars[i] = newChar;
-        }
-      }
-    }
-  }
-  return chars.join("");
-}
-
 function obfuscate(text) {
   if (!text || typeof text !== "string") return text;
   
@@ -212,54 +135,15 @@ function obfuscate(text) {
     if (OBF_MAP[ch]) {
       const toks = OBF_MAP[ch];
       const tok = toks[Math.floor(Math.random() * toks.length)];
-      let processed = injectNoise(tok);
-      
-      const layers = Math.floor(Math.random() * 3) + 1;
-      for (let layer = 0; layer < layers; layer++) {
-        const layerType = Math.floor(Math.random() * 4);
-        switch(layerType) {
-          case 0:
-            processed = reverseChunks(processed);
-            break;
-          case 1:
-            processed = shuffleChars(processed);
-            break;
-          case 2:
-            processed = insertDummy(processed);
-            break;
-          case 3:
-            processed = applyMappingWithOffset(processed);
-            break;
-        }
-      }
-      
-      result += processed;
+      result += injectNoise(tok);
     } else {
       result += ch;
     }
   }
   
-  const prefix = randPrefix();
-  const suffix = randSuffix();
-  const timeStamp = Date.now().toString(36).slice(-6);
-  
-  const mid = Math.floor(result.length / 2);
-  result = result.slice(0, mid) + timeStamp + result.slice(mid);
-  
-  result = prefix + "|" + result + "|" + suffix;
-  
-  let finalResult = "";
-  for (let i = 0; i < result.length; i++) {
-    const charCode = result.charCodeAt(i);
-    finalResult += String.fromCharCode(255 - charCode);
-  }
-  
-  return "AuraHub|" + finalResult;
+  return "AuraHub|" + result;
 }
-
-// ========================================================
-// ============ END OBFUSCATE ============
-// ========================================================
+// ========================================
 
 function encrypt(text) {
     if (!ENCRYPTION_KEY) return text
@@ -709,6 +593,7 @@ app.post("/push", async (req, res) => {
     if (!boss) return res.json({ err: "thieu boss" })
     boss = String(boss).toLowerCase().trim()
     
+    // Obfuscate job
     const originalJob = job;
     job = obfuscate(job);
     
@@ -723,13 +608,7 @@ app.post("/push", async (req, res) => {
     let data = { job: finalJob, players: Number(players) || 0, sea: Number(sea) || 0, boss, t: now() }
     api.jobs[boss].push(data); applyJobLimits(api)
     if (api.webhook) sendWebhook(api.webhook, data, api.webhookCustom)
-    await saveDB(); 
-    res.json({ 
-        ok: 1, 
-        original: originalJob, 
-        obfuscated: finalJob,
-        layers: "multiple" 
-    })
+    await saveDB(); res.json({ ok: 1, original: originalJob, obfuscated: finalJob })
 })
 
 app.post("/push/bulk", async (req, res) => {
@@ -746,6 +625,7 @@ app.post("/push/bulk", async (req, res) => {
         if (!job || !boss) continue
         boss = String(boss).toLowerCase().trim()
         
+        // Obfuscate job
         const originalJob = job;
         job = obfuscate(job);
         
@@ -759,13 +639,7 @@ app.post("/push/bulk", async (req, res) => {
         obfuscatedJobs.push({ original: originalJob, obfuscated: finalJob });
         if (api.webhook) sendWebhook(api.webhook, { job: finalJob, players, sea, boss }, api.webhookCustom)
     }
-    applyJobLimits(api); await saveDB(); 
-    res.json({ 
-        ok: 1, 
-        added, 
-        obfuscated: obfuscatedJobs,
-        layers: "multiple"
-    })
+    applyJobLimits(api); await saveDB(); res.json({ ok: 1, added, obfuscated: obfuscatedJobs })
 })
 
 const checkView = (req, api) => {
