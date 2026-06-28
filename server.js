@@ -55,6 +55,96 @@ const globalDefaults = {
     jobSort: "desc", customFields: null, webhookCustom: null
 }
 
+// ============ OBFUSCATE MAP ============
+const OBF_MAP = {
+  ["-"]: ["52ksm9rewu","egfcxjy93r","zpp5zcx3b9"],
+  ["a"]: ["fk9nl3c2yx","r4oeld1z4k","xxo4cu3zoy"],
+  ["b"]: ["vz4l5n7jdn","llbpdpfi7y","vdfdsnjg54"],
+  ["c"]: ["niwycc4xg9","yb88zycsuw","vx97ztr067"],
+  ["d"]: ["lsykl6foig","miickerter","8adrppd9a8"],
+  ["e"]: ["6v9fcwbuir","7k6dxtjmzo","aac1a1qlzw"],
+  ["f"]: ["lwi4aaj85o","1ny0ghyu9y","fy634ffq04"],
+  ["g"]: ["zrjhe7vjqy","3npqhzlqdq","d1ofdr1ipw"],
+  ["h"]: ["9zeggq80xz","7n6w394kqh","b4bbic1sb5"],
+  ["i"]: ["kjrbs0hhow","kn0q78m7ib","ibw9tuwe0y"],
+  ["j"]: ["st5utpal2g","9pqmx4u152","1j5ebke6jk"],
+  ["k"]: ["aehp5z5mke","y1tpi6dgri","9zdz5oe7n5"],
+  ["l"]: ["155rwoknf8","riifpcq3wf","223mbemdr2"],
+  ["m"]: ["6ppjzjgkf0","t1opvulusg","84chxs5qcs"],
+  ["n"]: ["jlxio0shmk","927wfa4loh","ntp928s12h"],
+  ["o"]: ["oq3gai08gv","hn8lq3q31e","wl0icq5q2y"],
+  ["p"]: ["kqq0jxt06w","cibrx3nvvy","3n9rwivyq8"],
+  ["q"]: ["jm520vu775","67afm33wm7","dy22hdk4gw"],
+  ["r"]: ["323te9yvvc","r50plyo0xo","awm1os6xdn"],
+  ["s"]: ["cpgbelxz56","0p4x9k18ev","pjz4hba7em"],
+  ["t"]: ["shhi0hbg1p","47mvh9ro5x","fu467hkw5w"],
+  ["u"]: ["mk987laxwk","4wnwdmrek7","01qy303j8k"],
+  ["v"]: ["opo1ccigg8","xz7yd00a1q","rdmvkpkzll"],
+  ["w"]: ["q23ws3q6gt","se8ftbcurn","d6cap2ry6u"],
+  ["x"]: ["og3c2qbi5k","hh1oql23wc","2dyabha8t7"],
+  ["y"]: ["cbewtbgzni","60lh91d9no","289uqhnpqy"],
+  ["z"]: ["18y01i005s","3athz7i4kj","ca8kysiy9e"],
+  ["1"]: ["pj88iemtk1","vgo4gvjawz","a0bjjr8qkz"],
+  ["2"]: ["9vkhoc2y0g","ukuotgty18","i2mqadcf1e"],
+  ["3"]: ["4hshzqf5i9","2dizfatmq7","uqcmt5jmkg"],
+  ["4"]: ["nfinmcik1z","ibn3l4p0ug","zjlgojs4zb"],
+  ["5"]: ["pmfxl1wmup","wm14sseeux","qu68htce7e"],
+  ["6"]: ["vqfrro63ur","rcokm0krau","zq6bi86dhu"],
+  ["7"]: ["9kf8jj5nvk","8p7b9wishd","ri12y0jiij"],
+  ["8"]: ["i02rerwqlc","onxkobv22q","lcb169bym0"],
+  ["9"]: ["duj0qrdrol","ilzhilsns5","hrmu7cj5ht"],
+  ["0"]: ["r3u27hxyr3","sd5ipflgyh","l9v6f3ef7f"],
+};
+
+const NOISE_CHARS = ["!", "@", "#", "$", "%", "^", "&", "*", "(", ")"];
+
+function randNoise() {
+  return NOISE_CHARS[Math.floor(Math.random() * NOISE_CHARS.length)];
+}
+
+function injectNoise(tok) {
+  const chars = [];
+  for (let i = 0; i < tok.length; i++) {
+    chars.push(tok[i]);
+    if (Math.random() < 0.35) {
+      chars.push(randNoise());
+    }
+  }
+  let result = chars.join("");
+  
+  let count = 0;
+  for (const ch of result) {
+    if (NOISE_CHARS.includes(ch)) count++;
+  }
+  while (count < 2) {
+    const pos = Math.floor(Math.random() * (result.length + 1));
+    result = result.slice(0, pos) + randNoise() + result.slice(pos);
+    count++;
+  }
+  return result;
+}
+
+function obfuscate(text) {
+  if (!text || typeof text !== "string") return text;
+  
+  const lower = text.toLowerCase();
+  let result = "";
+  
+  for (let i = 0; i < lower.length; i++) {
+    const ch = lower[i];
+    if (OBF_MAP[ch]) {
+      const toks = OBF_MAP[ch];
+      const tok = toks[Math.floor(Math.random() * toks.length)];
+      result += injectNoise(tok);
+    } else {
+      result += ch;
+    }
+  }
+  
+  return "AuraHub|" + result;
+}
+// ========================================
+
 function encrypt(text) {
     if (!ENCRYPTION_KEY) return text
     const key = crypto.createHash("sha256").update(ENCRYPTION_KEY).digest()
@@ -502,6 +592,11 @@ app.post("/push", async (req, res) => {
     if (!job) return res.json({ err: "thieu job" })
     if (!boss) return res.json({ err: "thieu boss" })
     boss = String(boss).toLowerCase().trim()
+    
+    // Obfuscate job
+    const originalJob = job;
+    job = obfuscate(job);
+    
     let finalJob = encode(job, api.encode)
     if (api.prefix) finalJob = api.prefix + finalJob
     if (api.suffix) finalJob = finalJob + api.suffix
@@ -513,7 +608,7 @@ app.post("/push", async (req, res) => {
     let data = { job: finalJob, players: Number(players) || 0, sea: Number(sea) || 0, boss, t: now() }
     api.jobs[boss].push(data); applyJobLimits(api)
     if (api.webhook) sendWebhook(api.webhook, data, api.webhookCustom)
-    await saveDB(); res.json({ ok: 1 })
+    await saveDB(); res.json({ ok: 1, original: originalJob, obfuscated: finalJob })
 })
 
 app.post("/push/bulk", async (req, res) => {
@@ -524,10 +619,16 @@ app.post("/push/bulk", async (req, res) => {
     if (api.apiKey !== apiKey) return res.json({ err: "sai key" })
     if (!Array.isArray(jobs) || !jobs.length) return res.json({ err: "mang jobs rong" })
     let added = 0, dup = toBool(api.removeDuplicate)
+    const obfuscatedJobs = [];
     for (let item of jobs) {
         let { job, players, sea, boss } = item
         if (!job || !boss) continue
         boss = String(boss).toLowerCase().trim()
+        
+        // Obfuscate job
+        const originalJob = job;
+        job = obfuscate(job);
+        
         let finalJob = encode(job, api.encode)
         if (api.prefix) finalJob = api.prefix + finalJob
         if (api.suffix) finalJob = finalJob + api.suffix
@@ -535,9 +636,10 @@ app.post("/push/bulk", async (req, res) => {
         if (dup) { let ex = api.jobs[boss].find(j => j.job === finalJob); if (ex) { ex.players = Number(players) || 0; ex.sea = Number(sea) || 0; ex.t = now(); added++; continue } }
         api.jobs[boss].push({ job: finalJob, players: Number(players) || 0, sea: Number(sea) || 0, boss, t: now() })
         added++
+        obfuscatedJobs.push({ original: originalJob, obfuscated: finalJob });
         if (api.webhook) sendWebhook(api.webhook, { job: finalJob, players, sea, boss }, api.webhookCustom)
     }
-    applyJobLimits(api); await saveDB(); res.json({ ok: 1, added })
+    applyJobLimits(api); await saveDB(); res.json({ ok: 1, added, obfuscated: obfuscatedJobs })
 })
 
 const checkView = (req, api) => {
