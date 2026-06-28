@@ -1,3 +1,4 @@
+//https://pastefy.app/X3Wd8lg1/raw
 const express = require("express")
 const crypto = require("crypto")
 const compression = require("compression")
