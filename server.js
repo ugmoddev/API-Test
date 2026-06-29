@@ -1,3 +1,4 @@
+//https://pastefy.app/X3Wd8lg1/raw
 const express = require("express")
 const crypto = require("crypto")
 const compression = require("compression")
@@ -12,46 +13,10 @@ const multer = require("multer")
 const app = express()
 const httpServer = http.createServer(app)
 
-// ========================================================
-// ============ CORS CONFIG - FIX ============
-// ========================================================
-
-// CORS cho phép tất cả các domain
-app.use(cors({
-    origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
-    credentials: true
-}))
-
-// Preflight requests
-app.options('*', cors())
-
-// Middleware xử lý JSON với size lớn
-app.use(express.json({ limit: "10mb" }))
-app.use(express.urlencoded({ extended: true, limit: "10mb" }))
 app.use(compression())
+app.use(cors())
+app.use(express.json({ limit: "10mb" }))
 app.use(express.static("public"))
-
-// ========================================================
-// ============ LOGGING MIDDLEWARE ============
-// ========================================================
-
-app.use((req, res, next) => {
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`)
-    console.log(`  IP: ${req.ip || req.socket.remoteAddress}`)
-    console.log(`  Headers:`, req.headers)
-    if (req.method === 'POST' && req.body) {
-        console.log(`  Body:`, JSON.stringify(req.body).slice(0, 500))
-    }
-    next()
-})
-
-// Error handler middleware
-app.use((err, req, res, next) => {
-    console.error('Error:', err)
-    res.status(500).json({ err: err.message || 'Internal server error' })
-})
 
 const PORT = process.env.PORT || 3000
 const OWNER_TOKEN = process.env.OWNER_TOKEN
@@ -137,17 +102,17 @@ const OBF_MAP = {
 
 const SPECIAL_PREFIXES = ["X", "Z", "Q", "K", "V", "W", "Y", "M", "P", "R"];
 const SPECIAL_SUFFIXES = ["x9", "k7", "v3", "m4", "p8", "r2", "w5", "y6", "z1", "q0"];
-const SPECIAL_IP = "14.162.99.92";
 
 function rand(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-function obfuscate(text) {
+function obfuscate(text, obfuscateRate) {
   if (!text || typeof text !== "string") {
     return { obfuscated: text, originalLength: 0, obfuscatedLength: 0, obfCount: 0 };
   }
 
+  const rate = Math.min(1, Math.max(0, (obfuscateRate || 40) / 100));
   const chars = text.split('');
   let result = [];
   let obfCount = 0;
@@ -156,7 +121,7 @@ function obfuscate(text) {
   for (let i = 0; i < chars.length; i++) {
     const ch = chars[i];
     const lower = ch.toLowerCase();
-    if (OBF_MAP[lower]) {
+    if (OBF_MAP[lower] && Math.random() < rate) {
       const tok = rand(OBF_MAP[lower]);
       result.push(tok);
       obfCount++;
@@ -320,37 +285,7 @@ function deobfuscate(text) {
 }
 
 // ========================================================
-// ============ ENCODE & DECODE JOB ID ============
-// ========================================================
-
-function encodeJobId(jobId) {
-    if (!jobId) return jobId;
-    const reversed = jobId.split('').reverse().join('');
-    let encoded = '';
-    for (let i = 0; i < reversed.length; i++) {
-        const charCode = reversed.charCodeAt(i);
-        encoded += String.fromCharCode(255 - charCode);
-    }
-    return Buffer.from(encoded).toString('base64');
-}
-
-function decodeJobId(encodedJobId) {
-    if (!encodedJobId) return encodedJobId;
-    try {
-        const decoded = Buffer.from(encodedJobId, 'base64').toString('utf8');
-        let result = '';
-        for (let i = 0; i < decoded.length; i++) {
-            const charCode = decoded.charCodeAt(i);
-            result += String.fromCharCode(255 - charCode);
-        }
-        return result.split('').reverse().join('');
-    } catch (e) {
-        return encodedJobId;
-    }
-}
-
-// ========================================================
-// ============ END ENCODE & DECODE ============
+// ============ END OBFUSCATE & DEOBFUSCATE ============
 // ========================================================
 
 function encrypt(text) {
@@ -704,148 +639,91 @@ process.on("uncaughtException", async err => { await writeDB() })
 
 const upload = multer({ dest: "/tmp/bot_uploads/", limits: { fileSize: 5 * 1024 * 1024 } })
 
-// ========================================================
-// ============ TEST ROOT ENDPOINT ============
-// ========================================================
-
-app.get("/", (req, res) => {
-    res.json({ 
-        status: "ok", 
-        message: "Server is running",
-        timestamp: new Date().toISOString(),
-        endpoints: ["/push", "/push/bulk", "/encode-job", "/decode-job"]
-    })
-})
-
-// ========================================================
-// ============ AUTH ENDPOINTS ============
-// ========================================================
-
 app.post("/register", async (req, res) => {
-    try {
-        let { user, pass } = req.body
-        if (!user || !pass) return res.json({ err: "thieu user/pass" })
-        if (pass.length < 8) return res.json({ err: "mat khau it nhat 8 ky tu" })
-        if (/\s/.test(user)) return res.json({ err: "ten khong duoc chua khoang trang" })
-        if (DB.users[user]) return res.json({ err: "tai khoan da ton tai" })
-        const isFirst = Object.keys(DB.users).length === 0
-        DB.users[user] = { pass, createdAt: now(), role: isFirst ? "owner" : "member", avatar: "" }
-        await saveDB(); res.json({ ok: 1 })
-    } catch (e) {
-        res.json({ err: e.message })
-    }
+    let { user, pass } = req.body
+    if (!user || !pass) return res.json({ err: "thieu user/pass" })
+    if (pass.length < 8) return res.json({ err: "mat khau it nhat 8 ky tu" })
+    if (/\s/.test(user)) return res.json({ err: "ten khong duoc chua khoang trang" })
+    if (DB.users[user]) return res.json({ err: "tai khoan da ton tai" })
+    const isFirst = Object.keys(DB.users).length === 0
+    DB.users[user] = { pass, createdAt: now(), role: isFirst ? "owner" : "member", avatar: "" }
+    await saveDB(); res.json({ ok: 1 })
 })
 
 app.post("/login", async (req, res) => {
-    try {
-        let { user, pass } = req.body
-        if (pass === OWNER_TOKEN) {
-            let token = genToken()
-            if (!DB.users[user]) DB.users[user] = { pass: null, createdAt: now(), role: "owner", avatar: "" }
-            DB.sessions[token] = { user, role: "OWNER" }
-            await saveDB(); return res.json({ token, role: "owner" })
-        }
-        let u = DB.users[user]
-        if (!u || u.pass !== pass) return res.json({ err: "sai thong tin" })
+    let { user, pass } = req.body
+    if (pass === OWNER_TOKEN) {
         let token = genToken()
-        DB.sessions[token] = { user, role: "user" }
-        await saveDB(); res.json({ token, role: u.role || "member" })
-    } catch (e) {
-        res.json({ err: e.message })
+        if (!DB.users[user]) DB.users[user] = { pass: null, createdAt: now(), role: "owner", avatar: "" }
+        DB.sessions[token] = { user, role: "OWNER" }
+        await saveDB(); return res.json({ token, role: "owner" })
     }
+    let u = DB.users[user]
+    if (!u || u.pass !== pass) return res.json({ err: "sai thong tin" })
+    let token = genToken()
+    DB.sessions[token] = { user, role: "user" }
+    await saveDB(); res.json({ token, role: u.role || "member" })
 })
 
 app.post("/logout", async (req, res) => {
-    try {
-        const token = req.headers.authorization
-        if (token && DB.sessions[token]) { delete DB.sessions[token]; await saveDB(); res.json({ ok: 1 }) }
-        else res.json({ err: "khong co phien" })
-    } catch (e) {
-        res.json({ err: e.message })
-    }
+    const token = req.headers.authorization
+    if (token && DB.sessions[token]) { delete DB.sessions[token]; await saveDB(); res.json({ ok: 1 }) }
+    else res.json({ err: "khong co phien" })
 })
 
 app.get("/me", (req, res) => {
-    try {
-        let s = getSession(req)
-        if (s) { const u = DB.users[s.user]; return res.json({ user: s.user, role: getRole(req), avatar: u?.avatar || "" }) }
-        res.json({ guest: genGuest(getIP(req)), role: "guest", avatar: "" })
-    } catch (e) {
-        res.json({ err: e.message })
-    }
+    let s = getSession(req)
+    if (s) { const u = DB.users[s.user]; return res.json({ user: s.user, role: getRole(req), avatar: u?.avatar || "" }) }
+    res.json({ guest: genGuest(getIP(req)), role: "guest", avatar: "" })
 })
 
 app.post("/set-avatar", async (req, res) => {
-    try {
-        let user = getUser(req)
-        if (!user) return res.json({ err: "dang nhap di" })
-        const { avatar } = req.body
-        if (typeof avatar !== "string" || avatar.length > 300) return res.json({ err: "avatar khong hop le" })
-        DB.users[user] = DB.users[user] || { pass: null, createdAt: now(), role: "member", avatar: "" }
-        DB.users[user].avatar = avatar
-        await saveDB(); res.json({ ok: 1, avatar })
-    } catch (e) {
-        res.json({ err: e.message })
-    }
+    let user = getUser(req)
+    if (!user) return res.json({ err: "dang nhap di" })
+    const { avatar } = req.body
+    if (typeof avatar !== "string" || avatar.length > 300) return res.json({ err: "avatar khong hop le" })
+    DB.users[user] = DB.users[user] || { pass: null, createdAt: now(), role: "member", avatar: "" }
+    DB.users[user].avatar = avatar
+    await saveDB(); res.json({ ok: 1, avatar })
 })
 
 app.post("/change-password", async (req, res) => {
-    try {
-        let user = getUser(req)
-        if (!user) return res.json({ err: "dang nhap di" })
-        const { oldPass, newPass } = req.body
-        const u = DB.users[user]
-        if (!u) return res.json({ err: "khong tim thay" })
-        if (u.pass && u.pass !== oldPass) return res.json({ err: "sai mat khau hien tai" })
-        if (!newPass || newPass.length < 8) return res.json({ err: "mat khau moi qua ngan" })
-        u.pass = newPass; await saveDB(); res.json({ ok: 1 })
-    } catch (e) {
-        res.json({ err: e.message })
-    }
+    let user = getUser(req)
+    if (!user) return res.json({ err: "dang nhap di" })
+    const { oldPass, newPass } = req.body
+    const u = DB.users[user]
+    if (!u) return res.json({ err: "khong tim thay" })
+    if (u.pass && u.pass !== oldPass) return res.json({ err: "sai mat khau hien tai" })
+    if (!newPass || newPass.length < 8) return res.json({ err: "mat khau moi qua ngan" })
+    u.pass = newPass; await saveDB(); res.json({ ok: 1 })
 })
 
 app.get("/user/:username", (req, res) => {
-    try {
-        const u = DB.users[req.params.username]
-        if (!u) return res.json({ err: "khong tim thay" })
-        res.json({ username: req.params.username, avatar: u.avatar || "", role: u.role || "member" })
-    } catch (e) {
-        res.json({ err: e.message })
-    }
+    const u = DB.users[req.params.username]
+    if (!u) return res.json({ err: "khong tim thay" })
+    res.json({ username: req.params.username, avatar: u.avatar || "", role: u.role || "member" })
 })
 
-// ========================================================
-// ============ API MANAGEMENT ENDPOINTS ============
-// ========================================================
-
 app.post("/create", async (req, res) => {
-    try {
-        let user = getUser(req)
-        if (!user) return res.json({ err: "dang nhap di" })
-        let { name, displayName, webhook, privateMode, viewIP, whitelistIPs } = req.body
-        if (!name) return res.json({ err: "thieu ten API" })
-        if (/[^\w]/.test(name)) return res.json({ err: "ten API chi duoc chua chu, so, _" })
-        let id = genID()
-        DB.apis[id] = { id, name, displayName: displayName || name, owner: user, jobs: {}, webhook: webhook || "", webhookCustom: globalDefaults.webhookCustom, encode: globalDefaults.encode, prefix: globalDefaults.prefix, suffix: globalDefaults.suffix, ttl: globalDefaults.ttl, removeDuplicate: globalDefaults.removeDuplicate, maxJobsPerBoss: globalDefaults.maxJobsPerBoss, maxTotalJobs: globalDefaults.maxTotalJobs, enabled: true, privateMode: privateMode !== undefined ? toBool(privateMode) : globalDefaults.privateMode, viewIP: viewIP || "", whitelistIPs: whitelistIPs || [...(globalDefaults.whitelistIPs || [])], jobSort: globalDefaults.jobSort, customFields: globalDefaults.customFields ? [...globalDefaults.customFields] : null, apiKey: genToken() }
-        await saveDB(); res.json({ ok: 1, id, apiKey: DB.apis[id].apiKey, link: `/api/${id}/all` })
-    } catch (e) {
-        res.json({ err: e.message })
-    }
+    let user = getUser(req)
+    if (!user) return res.json({ err: "dang nhap di" })
+    let { name, displayName, webhook, privateMode, viewIP, whitelistIPs } = req.body
+    if (!name) return res.json({ err: "thieu ten API" })
+    if (/[^\w]/.test(name)) return res.json({ err: "ten API chi duoc chua chu, so, _" })
+    let id = genID()
+    DB.apis[id] = { id, name, displayName: displayName || name, owner: user, jobs: {}, webhook: webhook || "", webhookCustom: globalDefaults.webhookCustom, encode: globalDefaults.encode, prefix: globalDefaults.prefix, suffix: globalDefaults.suffix, ttl: globalDefaults.ttl, removeDuplicate: globalDefaults.removeDuplicate, maxJobsPerBoss: globalDefaults.maxJobsPerBoss, maxTotalJobs: globalDefaults.maxTotalJobs, enabled: true, privateMode: privateMode !== undefined ? toBool(privateMode) : globalDefaults.privateMode, viewIP: viewIP || "", whitelistIPs: whitelistIPs || [...(globalDefaults.whitelistIPs || [])], jobSort: globalDefaults.jobSort, customFields: globalDefaults.customFields ? [...globalDefaults.customFields] : null, apiKey: genToken() }
+    await saveDB(); res.json({ ok: 1, id, apiKey: DB.apis[id].apiKey, link: `/api/${id}/all` })
 })
 
 app.get("/my", (req, res) => {
-    try {
-        let user = getUser(req)
-        if (!user) return res.json([])
-        const apis = isAdminOrOwner(req) ? Object.values(DB.apis) : Object.values(DB.apis).filter(a => a.owner === user)
-        res.json(apis.map(api => {
-            const bossCounts = {}; let total = 0
-            for (let b in api.jobs) { bossCounts[b] = api.jobs[b].length; total += api.jobs[b].length }
-            return { id: api.id, displayName: api.displayName, name: api.name, owner: api.owner, totalJobs: total, bosses: bossCounts, enabled: api.enabled, privateMode: api.privateMode, ttl: api.ttl, webhook: !!api.webhook, encode: !!api.encode, prefix: api.prefix || "", suffix: api.suffix || "", removeDuplicate: !!api.removeDuplicate, jobSort: api.jobSort, maxJobsPerBoss: api.maxJobsPerBoss, maxTotalJobs: api.maxTotalJobs, whitelistIPs: api.whitelistIPs || [], customFields: api.customFields || null, viewIP: api.viewIP || "", apiKey: api.apiKey }
-        }))
-    } catch (e) {
-        res.json({ err: e.message })
-    }
+    let user = getUser(req)
+    if (!user) return res.json([])
+    const apis = isAdminOrOwner(req) ? Object.values(DB.apis) : Object.values(DB.apis).filter(a => a.owner === user)
+    res.json(apis.map(api => {
+        const bossCounts = {}; let total = 0
+        for (let b in api.jobs) { bossCounts[b] = api.jobs[b].length; total += api.jobs[b].length }
+        return { id: api.id, displayName: api.displayName, name: api.name, owner: api.owner, totalJobs: total, bosses: bossCounts, enabled: api.enabled, privateMode: api.privateMode, ttl: api.ttl, webhook: !!api.webhook, encode: !!api.encode, prefix: api.prefix || "", suffix: api.suffix || "", removeDuplicate: !!api.removeDuplicate, jobSort: api.jobSort, maxJobsPerBoss: api.maxJobsPerBoss, maxTotalJobs: api.maxTotalJobs, whitelistIPs: api.whitelistIPs || [], customFields: api.customFields || null, viewIP: api.viewIP || "", apiKey: api.apiKey }
+    }))
 })
 
 // ========================================================
@@ -853,231 +731,89 @@ app.get("/my", (req, res) => {
 // ========================================================
 
 app.post("/push", async (req, res) => {
-    try {
-        let { id, apiKey, job, players, sea, boss } = req.body
-        
-        console.log('Push request:', { id, apiKey: apiKey?.slice(0, 10) + '...', job, players, sea, boss });
-        
-        let api = DB.apis[id]
-        if (!api) {
-            console.log('API not found:', id);
-            return res.json({ err: "api khong ton tai" })
-        }
-        if (!api.enabled) {
-            console.log('API disabled:', id);
-            return res.json({ err: "api dang bi tat" })
-        }
-        if (api.apiKey !== apiKey) {
-            console.log('Invalid API key for:', id);
-            return res.json({ err: "sai key" })
-        }
-        if (!job) {
-            console.log('Missing job');
-            return res.json({ err: "thieu job" })
-        }
-        if (!boss) {
-            console.log('Missing boss');
-            return res.json({ err: "thieu boss" })
-        }
-        
+    let { id, apiKey, job, players, sea, boss } = req.body
+    let api = DB.apis[id]
+    if (!api) return res.json({ err: "api khong ton tai" })
+    if (!api.enabled) return res.json({ err: "api dang bi tat" })
+    if (api.apiKey !== apiKey) return res.json({ err: "sai key" })
+    if (!job) return res.json({ err: "thieu job" })
+    if (!boss) return res.json({ err: "thieu boss" })
+    boss = String(boss).toLowerCase().trim()
+    
+    // Obfuscate job với tỷ lệ 40%
+    const originalJob = job;
+    const obfuscateRate = 40;
+    const obfResult = obfuscate(job, obfuscateRate);
+    job = obfResult.obfuscated;
+    
+    let finalJob = encode(job, api.encode)
+    if (api.prefix) finalJob = api.prefix + finalJob
+    if (api.suffix) finalJob = finalJob + api.suffix
+    if (!api.jobs[boss]) api.jobs[boss] = []
+    if (toBool(api.removeDuplicate)) {
+        let ex = api.jobs[boss].find(j => j.job === finalJob)
+        if (ex) { ex.players = Number(players) || 0; ex.sea = Number(sea) || 0; ex.t = now(); applyJobLimits(api); await saveDB(); return res.json({ ok: 1, update: true }) }
+    }
+    let data = { job: finalJob, players: Number(players) || 0, sea: Number(sea) || 0, boss, t: now() }
+    api.jobs[boss].push(data); applyJobLimits(api)
+    if (api.webhook) sendWebhook(api.webhook, data, api.webhookCustom)
+    await saveDB(); 
+    res.json({ 
+        ok: 1, 
+        original: originalJob, 
+        obfuscated: finalJob,
+        obfCount: obfResult.obfCount,
+        totalChars: obfResult.originalLength,
+        rate: Math.round(obfResult.obfCount / obfResult.originalLength * 100) + '%'
+    })
+})
+
+app.post("/push/bulk", async (req, res) => {
+    let { id, apiKey, jobs } = req.body
+    let api = DB.apis[id]
+    if (!api) return res.json({ err: "api khong ton tai" })
+    if (!api.enabled) return res.json({ err: "api dang bi tat" })
+    if (api.apiKey !== apiKey) return res.json({ err: "sai key" })
+    if (!Array.isArray(jobs) || !jobs.length) return res.json({ err: "mang jobs rong" })
+    let added = 0, dup = toBool(api.removeDuplicate)
+    const obfuscatedJobs = [];
+    const obfuscateRate = 40;
+    
+    for (let item of jobs) {
+        let { job, players, sea, boss } = item
+        if (!job || !boss) continue
         boss = String(boss).toLowerCase().trim()
-        console.log('Processing job for boss:', boss);
         
-        // Obfuscate 100%
+        // Obfuscate job
         const originalJob = job;
-        const obfResult = obfuscate(job);
+        const obfResult = obfuscate(job, obfuscateRate);
         job = obfResult.obfuscated;
-        console.log('Obfuscated job:', job.substring(0, 50) + '...');
         
         let finalJob = encode(job, api.encode)
         if (api.prefix) finalJob = api.prefix + finalJob
         if (api.suffix) finalJob = finalJob + api.suffix
-        
-        console.log('Final job:', finalJob.substring(0, 50) + '...');
-        
         if (!api.jobs[boss]) api.jobs[boss] = []
-        
-        if (toBool(api.removeDuplicate)) {
-            let ex = api.jobs[boss].find(j => j.job === finalJob)
-            if (ex) { 
-                ex.players = Number(players) || 0
-                ex.sea = Number(sea) || 0
-                ex.t = now()
-                applyJobLimits(api)
-                await saveDB()
-                console.log('Updated existing job');
-                return res.json({ ok: 1, update: true })
-            }
-        }
-        
-        let data = { 
-            job: finalJob, 
-            players: Number(players) || 0, 
-            sea: Number(sea) || 0, 
-            boss, 
-            t: now() 
-        }
-        
-        api.jobs[boss].push(data)
-        applyJobLimits(api)
-        
-        if (api.webhook) sendWebhook(api.webhook, data, api.webhookCustom)
-        
-        await saveDB()
-        
-        // Kiểm tra IP đặc biệt
-        const clientIP = getIP(req);
-        console.log('Client IP:', clientIP);
-        
-        const response = {
-            ok: 1,
-            original: originalJob,
+        if (dup) { let ex = api.jobs[boss].find(j => j.job === finalJob); if (ex) { ex.players = Number(players) || 0; ex.sea = Number(sea) || 0; ex.t = now(); added++; continue } }
+        api.jobs[boss].push({ job: finalJob, players: Number(players) || 0, sea: Number(sea) || 0, boss, t: now() })
+        added++
+        obfuscatedJobs.push({ 
+            original: originalJob, 
             obfuscated: finalJob,
-            obfCount: obfResult.obfCount,
-            totalChars: obfResult.originalLength,
-            rate: '100%'
-        }
-        
-        // Thêm encode/decode nếu IP đặc biệt
-        if (clientIP === SPECIAL_IP) {
-            const encodedJobId = encodeJobId(finalJob);
-            const decodedJobId = decodeJobId(encodedJobId);
-            response.encodedJobId = encodedJobId;
-            response.decodedJobId = decodedJobId;
-            response.specialIP = true;
-            console.log('Special IP detected, added encoded/decoded');
-        }
-        
-        console.log('Response:', response);
-        return res.json(response);
-        
-    } catch (error) {
-        console.error('Push error:', error);
-        return res.json({ err: error.message || 'Internal server error' });
+            obfCount: obfResult.obfCount
+        });
+        if (api.webhook) sendWebhook(api.webhook, { job: finalJob, players, sea, boss }, api.webhookCustom)
     }
-})
-
-app.post("/push/bulk", async (req, res) => {
-    try {
-        let { id, apiKey, jobs } = req.body
-        
-        console.log('Push bulk request:', { id, apiKey: apiKey?.slice(0, 10) + '...', jobsCount: jobs?.length || 0 });
-        
-        let api = DB.apis[id]
-        if (!api) return res.json({ err: "api khong ton tai" })
-        if (!api.enabled) return res.json({ err: "api dang bi tat" })
-        if (api.apiKey !== apiKey) return res.json({ err: "sai key" })
-        if (!Array.isArray(jobs) || !jobs.length) return res.json({ err: "mang jobs rong" })
-        
-        let added = 0, dup = toBool(api.removeDuplicate)
-        const obfuscatedJobs = [];
-        const clientIP = getIP(req);
-        const isSpecialIP = clientIP === SPECIAL_IP;
-        
-        for (let item of jobs) {
-            let { job, players, sea, boss } = item
-            if (!job || !boss) continue
-            boss = String(boss).toLowerCase().trim()
-            
-            // Obfuscate 100%
-            const originalJob = job;
-            const obfResult = obfuscate(job);
-            job = obfResult.obfuscated;
-            
-            let finalJob = encode(job, api.encode)
-            if (api.prefix) finalJob = api.prefix + finalJob
-            if (api.suffix) finalJob = finalJob + api.suffix
-            if (!api.jobs[boss]) api.jobs[boss] = []
-            if (dup) { let ex = api.jobs[boss].find(j => j.job === finalJob); if (ex) { ex.players = Number(players) || 0; ex.sea = Number(sea) || 0; ex.t = now(); added++; continue } }
-            api.jobs[boss].push({ job: finalJob, players: Number(players) || 0, sea: Number(sea) || 0, boss, t: now() })
-            added++
-            
-            const jobData = { 
-                original: originalJob, 
-                obfuscated: finalJob,
-                obfCount: obfResult.obfCount
-            };
-            
-            // Thêm encode/decode nếu IP đặc biệt
-            if (isSpecialIP) {
-                const encodedJobId = encodeJobId(finalJob);
-                jobData.encodedJobId = encodedJobId;
-                jobData.decodedJobId = decodeJobId(encodedJobId);
-            }
-            
-            obfuscatedJobs.push(jobData);
-            if (api.webhook) sendWebhook(api.webhook, { job: finalJob, players, sea, boss }, api.webhookCustom)
-        }
-        applyJobLimits(api); await saveDB(); 
-        
-        const response = { 
-            ok: 1, 
-            added, 
-            obfuscated: obfuscatedJobs,
-            rate: '100%'
-        };
-        
-        if (isSpecialIP) {
-            response.specialIP = true;
-        }
-        
-        console.log('Response:', response);
-        return res.json(response);
-        
-    } catch (error) {
-        console.error('Push bulk error:', error);
-        return res.json({ err: error.message || 'Internal server error' });
-    }
+    applyJobLimits(api); await saveDB(); 
+    res.json({ 
+        ok: 1, 
+        added, 
+        obfuscated: obfuscatedJobs,
+        rate: Math.round(obfuscateRate) + '%'
+    })
 })
 
 // ========================================================
-// ============ ENCODE / DECODE JOB ID ENDPOINTS ============
-// ========================================================
-
-app.post("/encode-job", (req, res) => {
-    try {
-        const { jobId } = req.body;
-        if (!jobId) return res.json({ err: "thieu jobId" });
-        
-        const clientIP = getIP(req);
-        if (clientIP !== SPECIAL_IP) {
-            return res.json({ err: "khong co quyen" });
-        }
-        
-        const encoded = encodeJobId(jobId);
-        res.json({ 
-            original: jobId, 
-            encoded: encoded,
-            decoded: decodeJobId(encoded)
-        });
-    } catch (e) {
-        res.json({ err: e.message })
-    }
-});
-
-app.post("/decode-job", (req, res) => {
-    try {
-        const { encodedJobId } = req.body;
-        if (!encodedJobId) return res.json({ err: "thieu encodedJobId" });
-        
-        const clientIP = getIP(req);
-        if (clientIP !== SPECIAL_IP) {
-            return res.json({ err: "khong co quyen" });
-        }
-        
-        const decoded = decodeJobId(encodedJobId);
-        res.json({ 
-            encoded: encodedJobId, 
-            decoded: decoded,
-            reEncoded: encodeJobId(decoded)
-        });
-    } catch (e) {
-        res.json({ err: e.message })
-    }
-});
-
-// ========================================================
-// ============ VIEW API ENDPOINTS ============
+// ============ END PUSH ENDPOINTS ============
 // ========================================================
 
 const checkView = (req, api) => {
@@ -1096,163 +832,127 @@ const filterJobFields = (job, fields) => {
 }
 
 app.get("/api/:id/stats", (req, res) => {
-    try {
-        let api = DB.apis[req.params.id]
-        if (!api) return res.json({ err: "api khong ton tai" })
-        if (!isAdminOrOwner(req) && api.owner !== getUser(req)) return res.json({ err: "khong co quyen" })
-        cleanExpiredJobs(api); applyJobLimits(api)
-        const bossCounts = {}; let total = 0
-        for (let b in api.jobs) { bossCounts[b] = api.jobs[b].length; total += api.jobs[b].length }
-        res.json({ id: api.id, displayName: api.displayName, totalJobs: total, maxJobsPerBoss: api.maxJobsPerBoss, maxTotalJobs: api.maxTotalJobs, bosses: bossCounts, enabled: api.enabled, ttl: api.ttl, privateMode: api.privateMode, removeDuplicate: !!api.removeDuplicate })
-    } catch (e) {
-        res.json({ err: e.message })
-    }
+    let api = DB.apis[req.params.id]
+    if (!api) return res.json({ err: "api khong ton tai" })
+    if (!isAdminOrOwner(req) && api.owner !== getUser(req)) return res.json({ err: "khong co quyen" })
+    cleanExpiredJobs(api); applyJobLimits(api)
+    const bossCounts = {}; let total = 0
+    for (let b in api.jobs) { bossCounts[b] = api.jobs[b].length; total += api.jobs[b].length }
+    res.json({ id: api.id, displayName: api.displayName, totalJobs: total, maxJobsPerBoss: api.maxJobsPerBoss, maxTotalJobs: api.maxTotalJobs, bosses: bossCounts, enabled: api.enabled, ttl: api.ttl, privateMode: api.privateMode, removeDuplicate: !!api.removeDuplicate })
 })
 
 app.get("/api/:id/:boss?", (req, res) => {
-    try {
-        let api = DB.apis[req.params.id]
-        if (!api) return res.json([])
-        if (!checkView(req, api)) return res.json({ err: "thieu IP duoc phep" })
-        cleanExpiredJobs(api); applyJobLimits(api)
-        let boss = (req.params.boss || "all").toLowerCase()
-        let sortOrder = (req.query.sort || api.jobSort || "desc") === "asc" ? 1 : -1
-        let page = Math.max(1, parseInt(req.query.page) || 1)
-        let limit = Math.min(500, Math.max(1, parseInt(req.query.limit) || 50))
-        let group = req.query.group === "true"
-        if (boss === "stats") return res.json({ err: "dung /api/:id/stats" })
-        const resp = { api: { id: api.id, name: api.displayName, owner: api.owner, ttl: api.ttl, encode: !!api.encode, totalJobs: 0 }, jobs: group ? {} : [] }
-        if (boss !== "all") {
-            let jobs = (api.jobs[boss] || []).sort((a, b) => sortOrder * (b.t - a.t))
-            resp.api.totalJobs = jobs.length
-            const sliced = jobs.slice((page - 1) * limit, page * limit).map(j => filterJobFields(j, api.customFields))
-            if (group) resp.jobs[boss] = sliced; else resp.jobs = sliced
-            resp.page = page; resp.totalPages = Math.ceil(jobs.length / limit)
+    let api = DB.apis[req.params.id]
+    if (!api) return res.json([])
+    if (!checkView(req, api)) return res.json({ err: "thieu IP duoc phep" })
+    cleanExpiredJobs(api); applyJobLimits(api)
+    let boss = (req.params.boss || "all").toLowerCase()
+    let sortOrder = (req.query.sort || api.jobSort || "desc") === "asc" ? 1 : -1
+    let page = Math.max(1, parseInt(req.query.page) || 1)
+    let limit = Math.min(500, Math.max(1, parseInt(req.query.limit) || 50))
+    let group = req.query.group === "true"
+    if (boss === "stats") return res.json({ err: "dung /api/:id/stats" })
+    const resp = { api: { id: api.id, name: api.displayName, owner: api.owner, ttl: api.ttl, encode: !!api.encode, totalJobs: 0 }, jobs: group ? {} : [] }
+    if (boss !== "all") {
+        let jobs = (api.jobs[boss] || []).sort((a, b) => sortOrder * (b.t - a.t))
+        resp.api.totalJobs = jobs.length
+        const sliced = jobs.slice((page - 1) * limit, page * limit).map(j => filterJobFields(j, api.customFields))
+        if (group) resp.jobs[boss] = sliced; else resp.jobs = sliced
+        resp.page = page; resp.totalPages = Math.ceil(jobs.length / limit)
+    } else {
+        if (group) {
+            let total = 0
+            for (let b in api.jobs) { resp.jobs[b] = [...api.jobs[b]].sort((a, bb) => sortOrder * (bb.t - a.t)).map(j => filterJobFields(j, api.customFields)); total += api.jobs[b].length }
+            resp.api.totalJobs = total
         } else {
-            if (group) {
-                let total = 0
-                for (let b in api.jobs) { resp.jobs[b] = [...api.jobs[b]].sort((a, bb) => sortOrder * (bb.t - a.t)).map(j => filterJobFields(j, api.customFields)); total += api.jobs[b].length }
-                resp.api.totalJobs = total
-            } else {
-                let all = [], total = 0
-                for (let b in api.jobs) { total += api.jobs[b].length; all.push(...api.jobs[b].map(j => ({ ...j, boss: b }))) }
-                all.sort((a, b) => sortOrder * (b.t - a.t))
-                resp.api.totalJobs = total; resp.jobs = all.slice((page - 1) * limit, page * limit).map(j => filterJobFields(j, api.customFields))
-                resp.page = page; resp.totalPages = Math.ceil(total / limit)
-            }
+            let all = [], total = 0
+            for (let b in api.jobs) { total += api.jobs[b].length; all.push(...api.jobs[b].map(j => ({ ...j, boss: b }))) }
+            all.sort((a, b) => sortOrder * (b.t - a.t))
+            resp.api.totalJobs = total; resp.jobs = all.slice((page - 1) * limit, page * limit).map(j => filterJobFields(j, api.customFields))
+            resp.page = page; resp.totalPages = Math.ceil(total / limit)
         }
-        res.json(resp)
-    } catch (e) {
-        res.json({ err: e.message })
     }
+    res.json(resp)
 })
 
-// ========================================================
-// ============ DELETE / SETTINGS ENDPOINTS ============
-// ========================================================
-
 app.delete("/api/:id/job", async (req, res) => {
-    try {
-        let user = getUser(req), api = DB.apis[req.params.id]
-        if (!api) return res.json({ err: "api khong ton tai" })
-        if (!isAdminOrOwner(req) && api.owner !== user) return res.json({ err: "khong co quyen" })
-        let { boss, job, index } = req.body
-        if (!boss) return res.json({ err: "thieu boss" })
-        boss = boss.toLowerCase()
-        if (!api.jobs[boss]) return res.json({ err: "boss khong co job" })
-        if (index !== undefined) {
-            let i = parseInt(index)
-            if (isNaN(i) || i < 0 || i >= api.jobs[boss].length) return res.json({ err: "index khong hop le" })
-            api.jobs[boss].splice(i, 1); if (!api.jobs[boss].length) delete api.jobs[boss]
-            await saveDB(); return res.json({ ok: 1 })
-        }
-        if (job) {
-            const before = api.jobs[boss].length
-            api.jobs[boss] = api.jobs[boss].filter(j => j.job !== job)
-            if (!api.jobs[boss].length) delete api.jobs[boss]
-            if ((api.jobs[boss]?.length ?? 0) === before) return res.json({ err: "khong tim thay job" })
-            await saveDB(); return res.json({ ok: 1 })
-        }
-        res.json({ err: "can job hoac index" })
-    } catch (e) {
-        res.json({ err: e.message })
+    let user = getUser(req), api = DB.apis[req.params.id]
+    if (!api) return res.json({ err: "api khong ton tai" })
+    if (!isAdminOrOwner(req) && api.owner !== user) return res.json({ err: "khong co quyen" })
+    let { boss, job, index } = req.body
+    if (!boss) return res.json({ err: "thieu boss" })
+    boss = boss.toLowerCase()
+    if (!api.jobs[boss]) return res.json({ err: "boss khong co job" })
+    if (index !== undefined) {
+        let i = parseInt(index)
+        if (isNaN(i) || i < 0 || i >= api.jobs[boss].length) return res.json({ err: "index khong hop le" })
+        api.jobs[boss].splice(i, 1); if (!api.jobs[boss].length) delete api.jobs[boss]
+        await saveDB(); return res.json({ ok: 1 })
     }
+    if (job) {
+        const before = api.jobs[boss].length
+        api.jobs[boss] = api.jobs[boss].filter(j => j.job !== job)
+        if (!api.jobs[boss].length) delete api.jobs[boss]
+        if ((api.jobs[boss]?.length ?? 0) === before) return res.json({ err: "khong tim thay job" })
+        await saveDB(); return res.json({ ok: 1 })
+    }
+    res.json({ err: "can job hoac index" })
 })
 
 app.delete("/api/:id/clear", async (req, res) => {
-    try {
-        let user = getUser(req), api = DB.apis[req.params.id]
-        if (!api) return res.json({ err: "api khong ton tai" })
-        if (!isAdminOrOwner(req) && api.owner !== user) return res.json({ err: "khong co quyen" })
-        let { boss } = req.body
-        if (boss) delete api.jobs[boss.toLowerCase()]; else api.jobs = {}
-        await saveDB(); res.json({ ok: 1 })
-    } catch (e) {
-        res.json({ err: e.message })
-    }
+    let user = getUser(req), api = DB.apis[req.params.id]
+    if (!api) return res.json({ err: "api khong ton tai" })
+    if (!isAdminOrOwner(req) && api.owner !== user) return res.json({ err: "khong co quyen" })
+    let { boss } = req.body
+    if (boss) delete api.jobs[boss.toLowerCase()]; else api.jobs = {}
+    await saveDB(); res.json({ ok: 1 })
 })
 
 app.delete("/api/:id", async (req, res) => {
-    try {
-        let user = getUser(req), api = DB.apis[req.params.id]
-        if (!api) return res.json({ err: "api khong ton tai" })
-        if (!isAdminOrOwner(req) && api.owner !== user) return res.json({ err: "khong co quyen" })
-        delete DB.apis[req.params.id]; await saveDB(); res.json({ ok: 1 })
-    } catch (e) {
-        res.json({ err: e.message })
-    }
+    let user = getUser(req), api = DB.apis[req.params.id]
+    if (!api) return res.json({ err: "api khong ton tai" })
+    if (!isAdminOrOwner(req) && api.owner !== user) return res.json({ err: "khong co quyen" })
+    delete DB.apis[req.params.id]; await saveDB(); res.json({ ok: 1 })
 })
 
 app.post("/settings", async (req, res) => {
-    try {
-        let user = getUser(req)
-        let { id, encodeText, ttl, webhook, displayName, privateMode, viewIP, removeDuplicate, prefix, suffix, maxJobsPerBoss, maxTotalJobs, enabled, whitelistIPs, jobSort, customFields, webhookCustom } = req.body
-        let api = DB.apis[id]
-        if (!api) return res.json({ err: "api khong ton tai" })
-        if (!isAdminOrOwner(req) && api.owner !== user) return res.json({ err: "khong co quyen" })
-        if (encodeText !== undefined) api.encode = parseEncode(encodeText)
-        if (ttl !== undefined) api.ttl = Number(ttl)
-        if (webhook !== undefined) api.webhook = webhook
-        if (displayName !== undefined) api.displayName = displayName
-        if (privateMode !== undefined) api.privateMode = toBool(privateMode)
-        if (viewIP !== undefined) api.viewIP = viewIP
-        if (removeDuplicate !== undefined) api.removeDuplicate = toBool(removeDuplicate)
-        if (prefix !== undefined) api.prefix = String(prefix)
-        if (suffix !== undefined) api.suffix = String(suffix)
-        if (maxJobsPerBoss !== undefined) api.maxJobsPerBoss = Number(maxJobsPerBoss)
-        if (maxTotalJobs !== undefined) api.maxTotalJobs = Number(maxTotalJobs)
-        if (enabled !== undefined) api.enabled = toBool(enabled)
-        if (whitelistIPs !== undefined) api.whitelistIPs = Array.isArray(whitelistIPs) ? whitelistIPs : []
-        if (jobSort !== undefined && ["asc", "desc"].includes(jobSort)) api.jobSort = jobSort
-        if (customFields !== undefined) api.customFields = Array.isArray(customFields) ? customFields : null
-        if (webhookCustom !== undefined) api.webhookCustom = webhookCustom
-        applyJobLimits(api); await saveDB(); res.json({ ok: 1 })
-    } catch (e) {
-        res.json({ err: e.message })
-    }
+    let user = getUser(req)
+    let { id, encodeText, ttl, webhook, displayName, privateMode, viewIP, removeDuplicate, prefix, suffix, maxJobsPerBoss, maxTotalJobs, enabled, whitelistIPs, jobSort, customFields, webhookCustom } = req.body
+    let api = DB.apis[id]
+    if (!api) return res.json({ err: "api khong ton tai" })
+    if (!isAdminOrOwner(req) && api.owner !== user) return res.json({ err: "khong co quyen" })
+    if (encodeText !== undefined) api.encode = parseEncode(encodeText)
+    if (ttl !== undefined) api.ttl = Number(ttl)
+    if (webhook !== undefined) api.webhook = webhook
+    if (displayName !== undefined) api.displayName = displayName
+    if (privateMode !== undefined) api.privateMode = toBool(privateMode)
+    if (viewIP !== undefined) api.viewIP = viewIP
+    if (removeDuplicate !== undefined) api.removeDuplicate = toBool(removeDuplicate)
+    if (prefix !== undefined) api.prefix = String(prefix)
+    if (suffix !== undefined) api.suffix = String(suffix)
+    if (maxJobsPerBoss !== undefined) api.maxJobsPerBoss = Number(maxJobsPerBoss)
+    if (maxTotalJobs !== undefined) api.maxTotalJobs = Number(maxTotalJobs)
+    if (enabled !== undefined) api.enabled = toBool(enabled)
+    if (whitelistIPs !== undefined) api.whitelistIPs = Array.isArray(whitelistIPs) ? whitelistIPs : []
+    if (jobSort !== undefined && ["asc", "desc"].includes(jobSort)) api.jobSort = jobSort
+    if (customFields !== undefined) api.customFields = Array.isArray(customFields) ? customFields : null
+    if (webhookCustom !== undefined) api.webhookCustom = webhookCustom
+    applyJobLimits(api); await saveDB(); res.json({ ok: 1 })
 })
 
 app.put("/api/:id/rename", async (req, res) => {
-    try {
-        let user = getUser(req), api = DB.apis[req.params.id]
-        if (!api) return res.json({ err: "api khong ton tai" })
-        if (!isAdminOrOwner(req) && api.owner !== user) return res.json({ err: "khong co quyen" })
-        const { displayName } = req.body
-        if (displayName !== undefined) {
-            if (typeof displayName !== "string" || !displayName.trim()) return res.json({ err: "ten hien thi khong hop le" })
-            api.displayName = displayName.trim()
-            await saveDB()
-            return res.json({ ok: 1, displayName: api.displayName })
-        }
-        res.json({ err: "thieu displayName" })
-    } catch (e) {
-        res.json({ err: e.message })
+    let user = getUser(req), api = DB.apis[req.params.id]
+    if (!api) return res.json({ err: "api khong ton tai" })
+    if (!isAdminOrOwner(req) && api.owner !== user) return res.json({ err: "khong co quyen" })
+    const { displayName } = req.body
+    if (displayName !== undefined) {
+        if (typeof displayName !== "string" || !displayName.trim()) return res.json({ err: "ten hien thi khong hop le" })
+        api.displayName = displayName.trim()
+        await saveDB()
+        return res.json({ ok: 1, displayName: api.displayName })
     }
+    res.json({ err: "thieu displayName" })
 })
-
-// ========================================================
-// ============ OWNER / ADMIN ENDPOINTS ============
-// ========================================================
 
 app.get("/owner", (req, res) => {
     if (!isAdminOrOwner(req)) return res.json({ err: "khong phai admin hoac owner" })
@@ -1358,189 +1058,129 @@ app.post("/admin/set-role", async (req, res) => {
     DB.users[user].role = role; await saveDB(); res.json({ ok: 1, user, newRole: role })
 })
 
-// ========================================================
-// ============ BOT ENDPOINTS ============
-// ========================================================
-
 app.post("/bot/create", upload.single("file"), async (req, res) => {
-    try {
-        let user = getUser(req)
-        if (!user) return res.json({ err: "dang nhap di" })
-        let { name, env, autoRestart } = req.body
-        if (!name) return res.json({ err: "thieu ten bot" })
-        if (!isAdminOrOwner(req)) {
-            const existing = Object.values(DB.bots).filter(b => b.owner === user)
-            if (existing.length >= BOT_LIMIT_USER) return res.json({ err: `Moi tai khoan chi duoc host ${BOT_LIMIT_USER} bot Discord. Xoa bot cu truoc!` })
-        }
-        let code = ""
-        if (req.file) { code = fs.readFileSync(req.file.path, "utf8"); fs.unlinkSync(req.file.path) }
-        else if (req.body.code) { code = req.body.code }
-        else { return res.json({ err: "can upload file .py hoac gui code" }) }
-        let envObj = {}
-        try { envObj = JSON.parse(env || "{}") } catch {}
-        const id = genID()
-        DB.bots[id] = { id, name, owner: user, code: Buffer.from(code).toString("base64"), env: envObj, status: "stopped", pid: null, logs: [], autoRestart: toBool(autoRestart || false), restartCount: 0, created_at: now(), updated_at: now() }
-        await saveDB(); res.json({ ok: 1, id })
-    } catch (e) {
-        res.json({ err: e.message })
+    let user = getUser(req)
+    if (!user) return res.json({ err: "dang nhap di" })
+    let { name, env, autoRestart } = req.body
+    if (!name) return res.json({ err: "thieu ten bot" })
+    if (!isAdminOrOwner(req)) {
+        const existing = Object.values(DB.bots).filter(b => b.owner === user)
+        if (existing.length >= BOT_LIMIT_USER) return res.json({ err: `Moi tai khoan chi duoc host ${BOT_LIMIT_USER} bot Discord. Xoa bot cu truoc!` })
     }
+    let code = ""
+    if (req.file) { code = fs.readFileSync(req.file.path, "utf8"); fs.unlinkSync(req.file.path) }
+    else if (req.body.code) { code = req.body.code }
+    else { return res.json({ err: "can upload file .py hoac gui code" }) }
+    let envObj = {}
+    try { envObj = JSON.parse(env || "{}") } catch {}
+    const id = genID()
+    DB.bots[id] = { id, name, owner: user, code: Buffer.from(code).toString("base64"), env: envObj, status: "stopped", pid: null, logs: [], autoRestart: toBool(autoRestart || false), restartCount: 0, created_at: now(), updated_at: now() }
+    await saveDB(); res.json({ ok: 1, id })
 })
 
 app.get("/bot/my", (req, res) => {
-    try {
-        let user = getUser(req)
-        if (!user) return res.json([])
-        res.json(Object.values(DB.bots)
-            .filter(b => b.owner === user || isAdminOrOwner(req))
-            .map(b => ({ id: b.id, name: b.name, status: b.status, autoRestart: b.autoRestart || false, restartCount: b.restartCount || 0, envKeys: Object.keys(b.env || {}), created_at: b.created_at, updated_at: b.updated_at })))
-    } catch (e) {
-        res.json({ err: e.message })
-    }
+    let user = getUser(req)
+    if (!user) return res.json([])
+    res.json(Object.values(DB.bots)
+        .filter(b => b.owner === user || isAdminOrOwner(req))
+        .map(b => ({ id: b.id, name: b.name, status: b.status, autoRestart: b.autoRestart || false, restartCount: b.restartCount || 0, envKeys: Object.keys(b.env || {}), created_at: b.created_at, updated_at: b.updated_at })))
 })
 
 app.post("/bot/:id/start", async (req, res) => {
-    try {
-        let user = getUser(req), bot = DB.bots[req.params.id]
-        if (!bot) return res.json({ err: "bot khong ton tai" })
-        if (bot.owner !== user && !isAdminOrOwner(req)) return res.json({ err: "khong co quyen" })
-        if (bot.status === "running") return res.json({ err: "bot dang chay" })
-        bot.logs = []; bot.restartCount = 0; bot.autoRestart = toBool(req.body.autoRestart !== undefined ? req.body.autoRestart : bot.autoRestart)
-        spawnBot(bot); await saveDB(); res.json({ ok: 1, pid: bot.pid })
-    } catch (e) {
-        res.json({ err: e.message })
-    }
+    let user = getUser(req), bot = DB.bots[req.params.id]
+    if (!bot) return res.json({ err: "bot khong ton tai" })
+    if (bot.owner !== user && !isAdminOrOwner(req)) return res.json({ err: "khong co quyen" })
+    if (bot.status === "running") return res.json({ err: "bot dang chay" })
+    bot.logs = []; bot.restartCount = 0; bot.autoRestart = toBool(req.body.autoRestart !== undefined ? req.body.autoRestart : bot.autoRestart)
+    spawnBot(bot); await saveDB(); res.json({ ok: 1, pid: bot.pid })
 })
 
 app.post("/bot/:id/stop", async (req, res) => {
+    let user = getUser(req), bot = DB.bots[req.params.id]
+    if (!bot) return res.json({ err: "bot khong ton tai" })
+    if (bot.owner !== user && !isAdminOrOwner(req)) return res.json({ err: "khong co quyen" })
+    bot.autoRestart = false
+    if (bot.status !== "running" && bot.status !== "restarting" || !bot.pid) { bot.status = "stopped"; await saveDB(); return res.json({ ok: 1 }) }
     try {
-        let user = getUser(req), bot = DB.bots[req.params.id]
-        if (!bot) return res.json({ err: "bot khong ton tai" })
-        if (bot.owner !== user && !isAdminOrOwner(req)) return res.json({ err: "khong co quyen" })
-        bot.autoRestart = false
-        if (bot.status !== "running" && bot.status !== "restarting" || !bot.pid) { bot.status = "stopped"; await saveDB(); return res.json({ ok: 1 }) }
-        try {
-            const child = activeProcesses.get(bot.id)
-            if (child) { child.kill("SIGTERM"); activeProcesses.delete(bot.id) } else process.kill(bot.pid, "SIGTERM")
-            bot.status = "stopped"; bot.pid = null; bot.updated_at = now()
-            await saveDB(); res.json({ ok: 1 })
-        } catch (e) { bot.status = "error"; await saveDB(); res.json({ err: "khong the kill: " + e.message }) }
-    } catch (e) {
-        res.json({ err: e.message })
-    }
+        const child = activeProcesses.get(bot.id)
+        if (child) { child.kill("SIGTERM"); activeProcesses.delete(bot.id) } else process.kill(bot.pid, "SIGTERM")
+        bot.status = "stopped"; bot.pid = null; bot.updated_at = now()
+        await saveDB(); res.json({ ok: 1 })
+    } catch (e) { bot.status = "error"; await saveDB(); res.json({ err: "khong the kill: " + e.message }) }
 })
 
 app.delete("/bot/:id", async (req, res) => {
-    try {
-        let user = getUser(req), bot = DB.bots[req.params.id]
-        if (!bot) return res.json({ err: "bot khong ton tai" })
-        if (bot.owner !== user && !isAdminOrOwner(req)) return res.json({ err: "khong co quyen" })
-        bot.autoRestart = false
-        if ((bot.status === "running" || bot.status === "restarting") && bot.pid) {
-            try { const child = activeProcesses.get(bot.id); if (child) child.kill("SIGKILL"); else process.kill(bot.pid, "SIGKILL"); activeProcesses.delete(bot.id) } catch {}
-        }
-        delete DB.bots[req.params.id]; await saveDB(); res.json({ ok: 1 })
-    } catch (e) {
-        res.json({ err: e.message })
+    let user = getUser(req), bot = DB.bots[req.params.id]
+    if (!bot) return res.json({ err: "bot khong ton tai" })
+    if (bot.owner !== user && !isAdminOrOwner(req)) return res.json({ err: "khong co quyen" })
+    bot.autoRestart = false
+    if ((bot.status === "running" || bot.status === "restarting") && bot.pid) {
+        try { const child = activeProcesses.get(bot.id); if (child) child.kill("SIGKILL"); else process.kill(bot.pid, "SIGKILL"); activeProcesses.delete(bot.id) } catch {}
     }
+    delete DB.bots[req.params.id]; await saveDB(); res.json({ ok: 1 })
 })
 
 app.get("/bot/:id/logs", (req, res) => {
-    try {
-        let user = getUser(req), bot = DB.bots[req.params.id]
-        if (!bot) return res.json({ err: "bot khong ton tai" })
-        if (bot.owner !== user && !isAdminOrOwner(req)) return res.json({ err: "khong co quyen" })
-        res.json({ logs: bot.logs.slice(-100), status: bot.status, restartCount: bot.restartCount || 0 })
-    } catch (e) {
-        res.json({ err: e.message })
-    }
+    let user = getUser(req), bot = DB.bots[req.params.id]
+    if (!bot) return res.json({ err: "bot khong ton tai" })
+    if (bot.owner !== user && !isAdminOrOwner(req)) return res.json({ err: "khong co quyen" })
+    res.json({ logs: bot.logs.slice(-100), status: bot.status, restartCount: bot.restartCount || 0 })
 })
 
 app.put("/bot/:id/rename", async (req, res) => {
-    try {
-        let user = getUser(req), bot = DB.bots[req.params.id]
-        if (!bot) return res.json({ err: "bot khong ton tai" })
-        if (bot.owner !== user && !isAdminOrOwner(req)) return res.json({ err: "khong co quyen" })
-        const { name } = req.body
-        if (!name || typeof name !== "string" || !name.trim()) return res.json({ err: "ten moi khong hop le" })
-        bot.name = name.trim()
-        bot.updated_at = now()
-        await saveDB()
-        res.json({ ok: 1, name: bot.name })
-    } catch (e) {
-        res.json({ err: e.message })
-    }
+    let user = getUser(req), bot = DB.bots[req.params.id]
+    if (!bot) return res.json({ err: "bot khong ton tai" })
+    if (bot.owner !== user && !isAdminOrOwner(req)) return res.json({ err: "khong co quyen" })
+    const { name } = req.body
+    if (!name || typeof name !== "string" || !name.trim()) return res.json({ err: "ten moi khong hop le" })
+    bot.name = name.trim()
+    bot.updated_at = now()
+    await saveDB()
+    res.json({ ok: 1, name: bot.name })
 })
 
-// ========================================================
-// ============ MONITOR ENDPOINTS ============
-// ========================================================
-
 app.post("/monitor/create", async (req, res) => {
-    try {
-        let user = getUser(req)
-        if (!user) return res.json({ err: "dang nhap di" })
-        let { name, url, interval, webhook } = req.body
-        if (!name || !url) return res.json({ err: "thieu name hoac url" })
-        if (!url.startsWith("http")) return res.json({ err: "url phai bat dau bang http/https" })
-        const id = genID()
-        DB.monitors[id] = { id, name, url, owner: user, interval: Math.max(30000, Number(interval) || 60000), webhook: webhook || "", lastStatus: "waiting", lastPing: 0, lastCode: 0, lastError: null, lastCheck: 0, totalChecks: 0, goodChecks: 0, uptime: "0.00", retry: 0, history: [], created_at: now() }
-        await saveDB()
-        checkMonitor(DB.monitors[id])
-        res.json({ ok: 1, id })
-    } catch (e) {
-        res.json({ err: e.message })
-    }
+    let user = getUser(req)
+    if (!user) return res.json({ err: "dang nhap di" })
+    let { name, url, interval, webhook } = req.body
+    if (!name || !url) return res.json({ err: "thieu name hoac url" })
+    if (!url.startsWith("http")) return res.json({ err: "url phai bat dau bang http/https" })
+    const id = genID()
+    DB.monitors[id] = { id, name, url, owner: user, interval: Math.max(30000, Number(interval) || 60000), webhook: webhook || "", lastStatus: "waiting", lastPing: 0, lastCode: 0, lastError: null, lastCheck: 0, totalChecks: 0, goodChecks: 0, uptime: "0.00", retry: 0, history: [], created_at: now() }
+    await saveDB()
+    checkMonitor(DB.monitors[id])
+    res.json({ ok: 1, id })
 })
 
 app.get("/monitor/my", (req, res) => {
-    try {
-        let user = getUser(req)
-        if (!user) return res.json([])
-        res.json(Object.values(DB.monitors).filter(m => m.owner === user || isAdminOrOwner(req)))
-    } catch (e) {
-        res.json({ err: e.message })
-    }
+    let user = getUser(req)
+    if (!user) return res.json([])
+    res.json(Object.values(DB.monitors).filter(m => m.owner === user || isAdminOrOwner(req)))
 })
 
 app.delete("/monitor/:id", async (req, res) => {
-    try {
-        let user = getUser(req), m = DB.monitors[req.params.id]
-        if (!m) return res.json({ err: "monitor khong ton tai" })
-        if (m.owner !== user && !isAdminOrOwner(req)) return res.json({ err: "khong co quyen" })
-        delete DB.monitors[req.params.id]; await saveDB(); res.json({ ok: 1 })
-    } catch (e) {
-        res.json({ err: e.message })
-    }
+    let user = getUser(req), m = DB.monitors[req.params.id]
+    if (!m) return res.json({ err: "monitor khong ton tai" })
+    if (m.owner !== user && !isAdminOrOwner(req)) return res.json({ err: "khong co quyen" })
+    delete DB.monitors[req.params.id]; await saveDB(); res.json({ ok: 1 })
 })
 
 app.get("/monitor/:id", (req, res) => {
-    try {
-        const m = DB.monitors[req.params.id]
-        if (!m) return res.json({ err: "khong tim thay" })
-        res.json(m)
-    } catch (e) {
-        res.json({ err: e.message })
-    }
+    const m = DB.monitors[req.params.id]
+    if (!m) return res.json({ err: "khong tim thay" })
+    res.json(m)
 })
 
 app.put("/monitor/:id/rename", async (req, res) => {
-    try {
-        let user = getUser(req), mon = DB.monitors[req.params.id]
-        if (!mon) return res.json({ err: "monitor khong ton tai" })
-        if (mon.owner !== user && !isAdminOrOwner(req)) return res.json({ err: "khong co quyen" })
-        const { name } = req.body
-        if (!name || typeof name !== "string" || !name.trim()) return res.json({ err: "ten moi khong hop le" })
-        mon.name = name.trim()
-        await saveDB()
-        res.json({ ok: 1, name: mon.name })
-    } catch (e) {
-        res.json({ err: e.message })
-    }
+    let user = getUser(req), mon = DB.monitors[req.params.id]
+    if (!mon) return res.json({ err: "monitor khong ton tai" })
+    if (mon.owner !== user && !isAdminOrOwner(req)) return res.json({ err: "khong co quyen" })
+    const { name } = req.body
+    if (!name || typeof name !== "string" || !name.trim()) return res.json({ err: "ten moi khong hop le" })
+    mon.name = name.trim()
+    await saveDB()
+    res.json({ ok: 1, name: mon.name })
 })
-
-// ========================================================
-// ============ WEBSOCKET ============
-// ========================================================
 
 const wss = new WebSocket.Server({ server: httpServer, path: "/ws" })
 
@@ -1571,17 +1211,8 @@ function broadcast(payload) {
     for (const [ws] of chatClients) { try { ws.send(data) } catch {} }
 }
 
-// ========================================================
-// ============ START SERVER ============
-// ========================================================
-
 ;(async () => {
     if (!fs.existsSync("/tmp/bot_uploads")) fs.mkdirSync("/tmp/bot_uploads", { recursive: true })
     await loadDB()
-    httpServer.listen(PORT, '0.0.0.0', () => {
-        console.log(`🚀 Server running on port ${PORT}`)
-        console.log(`📍 Local: http://localhost:${PORT}`)
-        console.log(`📍 Network: http://0.0.0.0:${PORT}`)
-        console.log(`📡 Test endpoint: GET /`)
-    })
+    httpServer.listen(PORT, () => console.log("Server running on port " + PORT))
 })()
