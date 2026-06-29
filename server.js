@@ -1,4 +1,3 @@
-//https://pastefy.app/X3Wd8lg1/raw
 const express = require("express")
 const crypto = require("crypto")
 const compression = require("compression")
@@ -19,18 +18,54 @@ app.use(express.json({ limit: "10mb" }))
 app.use(express.static("public"))
 
 const PORT = process.env.PORT || 3000
+
+// ============================================================
+// ENVIRONMENT VARIABLES - FIXED
+// ============================================================
+
+// OWNER_TOKEN - Auto generate if not set
+if (!process.env.OWNER_TOKEN) {
+    console.warn('⚠️ OWNER_TOKEN not set, generating...')
+    process.env.OWNER_TOKEN = crypto.randomBytes(32).toString('hex')
+    console.log('✅ Generated OWNER_TOKEN:', process.env.OWNER_TOKEN)
+    console.log('ℹ️  Please save this token for future reference')
+}
 const OWNER_TOKEN = process.env.OWNER_TOKEN
-const GITHUB_TOKEN = process.env.GITHUB_TOKEN
-const GITHUB_REPO = process.env.GITHUB_REPO
+
+// GITHUB_TOKEN - Check and warn if missing
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN || ''
+const GITHUB_REPO = process.env.GITHUB_REPO || ''
 const GITHUB_BRANCH = process.env.GITHUB_BRANCH || "main"
+
+if (!GITHUB_TOKEN || !GITHUB_REPO) {
+    console.warn('⚠️ GITHUB_TOKEN or GITHUB_REPO not set')
+    console.warn('ℹ️  GitHub features will be disabled')
+    console.warn('ℹ️  Set GITHUB_TOKEN and GITHUB_REPO in environment variables')
+}
+
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || ""
 
-if (!OWNER_TOKEN) throw "missing OWNER_TOKEN"
-if (!GITHUB_TOKEN || !GITHUB_REPO) throw "missing GITHUB config"
+// ============================================================
+// CHECK GITHUB AVAILABILITY
+// ============================================================
+
+const isGitHubAvailable = () => {
+    return GITHUB_TOKEN && GITHUB_REPO
+}
+
+// ============================================================
+// PYTHON PACKAGES - Skip if not available
+// ============================================================
 
 try {
     execSync("python3 -m pip install --user discord.py aiohttp", { stdio: "ignore" })
-} catch (e) {}
+} catch (e) {
+    console.warn('⚠️ Python packages installation skipped (may not be available)')
+}
+
+// ============================================================
+// CONSTANTS
+// ============================================================
 
 const DB_PATH = "db.json"
 const DB_BACKUP_PATH = "db.backup.json"
@@ -56,9 +91,9 @@ const globalDefaults = {
     jobSort: "desc", customFields: null, webhookCustom: null
 }
 
-// ========================================================
-// ============ OBFUSCATE & DEOBFUSCATE ============
-// ========================================================
+// ============================================================
+// OBFUSCATE & DEOBFUSCATE
+// ============================================================
 
 const OBF_MAP = {
   ["-"]: ["52ksm9rewu", "egfcxjy93r", "zpp5zcx3b9"],
@@ -284,9 +319,9 @@ function deobfuscate(text) {
   }
 }
 
-// ========================================================
-// ============ END OBFUSCATE & DEOBFUSCATE ============
-// ========================================================
+// ============================================================
+// ENCRYPT / DECRYPT
+// ============================================================
 
 function encrypt(text) {
     if (!ENCRYPTION_KEY) return text
@@ -314,19 +349,43 @@ function decrypt(text) {
     }
 }
 
+// ============================================================
+// GITHUB FUNCTIONS - FIXED
+// ============================================================
+
 async function fetchFileFromGithub(filePath) {
-    const url = `https://api.github.com/repos/${GITHUB_REPO}/contents/${filePath}?ref=${GITHUB_BRANCH}`
-    const res = await fetch(url, { headers: { Authorization: `token ${GITHUB_TOKEN}`, Accept: "application/vnd.github.v3+json" } })
-    if (!res.ok) return null
-    const data = await res.json()
-    fileSha[filePath] = data.sha
-    return decrypt(Buffer.from(data.content, "base64").toString("utf8"))
+    if (!isGitHubAvailable()) {
+        console.warn('⚠️ GitHub not available, skipping fetch')
+        return null
+    }
+    try {
+        const url = `https://api.github.com/repos/${GITHUB_REPO}/contents/${filePath}?ref=${GITHUB_BRANCH}`
+        const res = await fetch(url, { 
+            headers: { 
+                Authorization: `token ${GITHUB_TOKEN}`, 
+                Accept: "application/vnd.github.v3+json" 
+            } 
+        })
+        if (!res.ok) return null
+        const data = await res.json()
+        fileSha[filePath] = data.sha
+        return decrypt(Buffer.from(data.content, "base64").toString("utf8"))
+    } catch (e) {
+        console.warn('⚠️ GitHub fetch failed:', e.message)
+        return null
+    }
 }
 
 async function getFileShaFromGithub(filePath) {
+    if (!isGitHubAvailable()) return null
     try {
         const url = `https://api.github.com/repos/${GITHUB_REPO}/contents/${filePath}?ref=${GITHUB_BRANCH}`
-        const res = await fetch(url, { headers: { Authorization: `token ${GITHUB_TOKEN}`, Accept: "application/vnd.github.v3+json" } })
+        const res = await fetch(url, { 
+            headers: { 
+                Authorization: `token ${GITHUB_TOKEN}`, 
+                Accept: "application/vnd.github.v3+json" 
+            } 
+        })
         if (!res.ok) return null
         const data = await res.json()
         fileSha[filePath] = data.sha
@@ -335,57 +394,113 @@ async function getFileShaFromGithub(filePath) {
 }
 
 async function initEmptyRepo() {
+    if (!isGitHubAvailable()) return
     const baseUrl = `https://api.github.com/repos/${GITHUB_REPO}`
     const headers = {
         Authorization: `token ${GITHUB_TOKEN}`,
         Accept: "application/vnd.github.v3+json",
         "Content-Type": "application/json"
     }
-    const treeRes = await fetch(`${baseUrl}/git/trees`, { method: "POST", headers, body: JSON.stringify({ tree: [] }) })
+    const treeRes = await fetch(`${baseUrl}/git/trees`, { 
+        method: "POST", 
+        headers, 
+        body: JSON.stringify({ tree: [] }) 
+    })
     if (!treeRes.ok) throw new Error("init tree failed")
     const treeData = await treeRes.json()
-    const commitRes = await fetch(`${baseUrl}/git/commits`, { method: "POST", headers, body: JSON.stringify({ message: "init", tree: treeData.sha, parents: [] }) })
+    const commitRes = await fetch(`${baseUrl}/git/commits`, { 
+        method: "POST", 
+        headers, 
+        body: JSON.stringify({ 
+            message: "init", 
+            tree: treeData.sha, 
+            parents: [] 
+        }) 
+    })
     if (!commitRes.ok) throw new Error("init commit failed")
     const commitData = await commitRes.json()
-    const refRes = await fetch(`${baseUrl}/git/refs`, { method: "POST", headers, body: JSON.stringify({ ref: `refs/heads/${GITHUB_BRANCH}`, sha: commitData.sha }) })
+    const refRes = await fetch(`${baseUrl}/git/refs`, { 
+        method: "POST", 
+        headers, 
+        body: JSON.stringify({ 
+            ref: `refs/heads/${GITHUB_BRANCH}`, 
+            sha: commitData.sha 
+        }) 
+    })
     if (!refRes.ok) throw new Error("init branch failed")
 }
 
 async function pushFileToGithub(filePath, content, retry = true) {
-    const branchCheckUrl = `https://api.github.com/repos/${GITHUB_REPO}/git/refs/heads/${GITHUB_BRANCH}`
-    let branchCheck = await fetch(branchCheckUrl, { headers: { Authorization: `token ${GITHUB_TOKEN}`, Accept: "application/vnd.github.v3+json" } })
-    if (!branchCheck.ok && branchCheck.status === 404) {
-        await initEmptyRepo()
-        await new Promise(r => setTimeout(r, 1000))
+    if (!isGitHubAvailable()) {
+        console.warn('⚠️ GitHub not available, skipping push')
+        return
     }
+    try {
+        const branchCheckUrl = `https://api.github.com/repos/${GITHUB_REPO}/git/refs/heads/${GITHUB_BRANCH}`
+        let branchCheck = await fetch(branchCheckUrl, { 
+            headers: { 
+                Authorization: `token ${GITHUB_TOKEN}`, 
+                Accept: "application/vnd.github.v3+json" 
+            } 
+        })
+        if (!branchCheck.ok && branchCheck.status === 404) {
+            await initEmptyRepo()
+            await new Promise(r => setTimeout(r, 1000))
+        }
 
-    const encrypted = encrypt(content)
-    const encoded = Buffer.from(encrypted).toString("base64")
-    const ghUrl = `https://api.github.com/repos/${GITHUB_REPO}/contents/${filePath}`
-    const ghHeaders = { Authorization: `token ${GITHUB_TOKEN}`, Accept: "application/vnd.github.v3+json", "Content-Type": "application/json" }
+        const encrypted = encrypt(content)
+        const encoded = Buffer.from(encrypted).toString("base64")
+        const ghUrl = `https://api.github.com/repos/${GITHUB_REPO}/contents/${filePath}`
+        const ghHeaders = { 
+            Authorization: `token ${GITHUB_TOKEN}`, 
+            Accept: "application/vnd.github.v3+json", 
+            "Content-Type": "application/json" 
+        }
 
-    let freshSha = await getFileShaFromGithub(filePath)
-    const body = { message: `update ${filePath}`, content: encoded, branch: GITHUB_BRANCH }
-    if (freshSha) body.sha = freshSha
+        let freshSha = await getFileShaFromGithub(filePath)
+        const body = { 
+            message: `update ${filePath}`, 
+            content: encoded, 
+            branch: GITHUB_BRANCH 
+        }
+        if (freshSha) body.sha = freshSha
 
-    let res = await fetch(ghUrl, { method: "PUT", headers: ghHeaders, body: JSON.stringify(body) })
+        let res = await fetch(ghUrl, { 
+            method: "PUT", 
+            headers: ghHeaders, 
+            body: JSON.stringify(body) 
+        })
 
-    if (res.status === 409 && retry) {
-        freshSha = await getFileShaFromGithub(filePath)
-        if (freshSha) body.sha = freshSha; else delete body.sha
-        res = await fetch(ghUrl, { method: "PUT", headers: ghHeaders, body: JSON.stringify(body) })
+        if (res.status === 409 && retry) {
+            freshSha = await getFileShaFromGithub(filePath)
+            if (freshSha) body.sha = freshSha
+            else delete body.sha
+            res = await fetch(ghUrl, { 
+                method: "PUT", 
+                headers: ghHeaders, 
+                body: JSON.stringify(body) 
+            })
+        }
+
+        if (!res.ok) {
+            const errText = await res.text().catch(() => res.statusText)
+            throw new Error(`Push failed for ${filePath}: ${res.status} ${errText}`)
+        }
+
+        const data = await res.json()
+        fileSha[filePath] = data.content.sha
+    } catch (e) {
+        console.warn('⚠️ GitHub push failed:', e.message)
     }
-
-    if (!res.ok) {
-        const errText = await res.text().catch(() => res.statusText)
-        throw new Error(`Push failed for ${filePath}: ${res.status} ${errText}`)
-    }
-
-    const data = await res.json()
-    fileSha[filePath] = data.content.sha
 }
 
-function validateDB(data) { return data && typeof data === "object" && data.apis && data.users }
+// ============================================================
+// DATABASE FUNCTIONS
+// ============================================================
+
+function validateDB(data) { 
+    return data && typeof data === "object" && data.apis && data.users 
+}
 
 function mergeDB(data) {
     if (!validateDB(data)) return false
@@ -415,49 +530,55 @@ function loadLocalDB() {
 }
 
 async function loadDB() {
-    try {
-        let raw = await fetchFileFromGithub(DB_PATH)
-        if (raw) {
-            const mainData = JSON.parse(raw)
-            mergeDB(mainData)
-            const rawBots = await fetchFileFromGithub(BOT_DB_PATH)
-            if (rawBots) {
-                const botsData = JSON.parse(rawBots)
-                DB.bots = botsData.bots || {}
-            } else {
-                const rawBotsBackup = await fetchFileFromGithub(BOT_DB_BACKUP_PATH)
-                if (rawBotsBackup) {
-                    const botsData = JSON.parse(rawBotsBackup)
+    // Try GitHub first
+    if (isGitHubAvailable()) {
+        try {
+            let raw = await fetchFileFromGithub(DB_PATH)
+            if (raw) {
+                const mainData = JSON.parse(raw)
+                mergeDB(mainData)
+                const rawBots = await fetchFileFromGithub(BOT_DB_PATH)
+                if (rawBots) {
+                    const botsData = JSON.parse(rawBots)
                     DB.bots = botsData.bots || {}
                 }
+                return true
             }
-            return true
+        } catch (e) {
+            console.warn('⚠️ GitHub load failed:', e.message)
         }
-        raw = await fetchFileFromGithub(DB_BACKUP_PATH)
-        if (raw) {
-            const mainData = JSON.parse(raw)
-            mergeDB(mainData)
-            return true
-        }
-    } catch (e) {}
+    }
+    
+    // Fallback: load local DB
     if (loadLocalDB()) return true
-    return false
+    
+    // Create new DB
+    console.log('📦 Creating new database')
+    DB = { apis: {}, users: {}, sessions: {}, bots: {}, monitors: {} }
+    return true
 }
 
 let writeQueue = Promise.resolve()
 let pendingWrite = false
 
 async function writeDB() {
-    const mainData = JSON.stringify({ apis: DB.apis, users: DB.users, sessions: DB.sessions, monitors: DB.monitors })
+    const mainData = JSON.stringify({ 
+        apis: DB.apis, 
+        users: DB.users, 
+        sessions: DB.sessions, 
+        monitors: DB.monitors 
+    })
     const botsData = JSON.stringify({ bots: DB.bots })
     saveLocalDB(JSON.stringify(DB))
-    try {
-        await pushFileToGithub(DB_BACKUP_PATH, mainData)
-        await pushFileToGithub(DB_PATH, mainData)
-        await pushFileToGithub(BOT_DB_BACKUP_PATH, botsData)
-        await pushFileToGithub(BOT_DB_PATH, botsData)
-    } catch (e) {
-        console.error("GitHub push failed:", e.message)
+    if (isGitHubAvailable()) {
+        try {
+            await pushFileToGithub(DB_BACKUP_PATH, mainData)
+            await pushFileToGithub(DB_PATH, mainData)
+            await pushFileToGithub(BOT_DB_BACKUP_PATH, botsData)
+            await pushFileToGithub(BOT_DB_PATH, botsData)
+        } catch (e) {
+            console.error("GitHub push failed:", e.message)
+        }
     }
 }
 
@@ -476,6 +597,10 @@ function saveDB() {
     })
 }
 
+// ============================================================
+// UTILITY FUNCTIONS
+// ============================================================
+
 const genToken = () => crypto.randomBytes(32).toString("hex")
 const genID = () => crypto.randomBytes(6).toString("hex")
 const now = () => Date.now()
@@ -492,15 +617,28 @@ const getRole = r => {
     return (u && u.role) ? u.role : "member"
 }
 const isOwner = r => getRole(r) === "owner"
-const isAdminOrOwner = r => { const role = getRole(r); return role === "owner" || role === "admin" }
-const parseEncode = txt => { try { return JSON.parse(txt) } catch { return null } }
-const encode = (txt, map) => { if (!map) return String(txt); return String(txt).split("").map(c => map[c] || c).join("") }
+const isAdminOrOwner = r => { 
+    const role = getRole(r); 
+    return role === "owner" || role === "admin" 
+}
+const parseEncode = txt => { 
+    try { return JSON.parse(txt) } 
+    catch { return null } 
+}
+const encode = (txt, map) => { 
+    if (!map) return String(txt); 
+    return String(txt).split("").map(c => map[c] || c).join("") 
+}
 
 function injectWebhookData(template, data) {
     if (!template) return null
     try {
         let str = typeof template === "string" ? template : JSON.stringify(template)
-        str = str.replace(/\{\{job\}\}/g, String(data.job || "")).replace(/\{\{boss\}\}/g, String(data.boss || "")).replace(/\{\{players\}\}/g, String(data.players || 0)).replace(/\{\{sea\}\}/g, String(data.sea || 0)).replace(/\{\{time\}\}/g, new Date().toISOString())
+        str = str.replace(/\{\{job\}\}/g, String(data.job || ""))
+          .replace(/\{\{boss\}\}/g, String(data.boss || ""))
+          .replace(/\{\{players\}\}/g, String(data.players || 0))
+          .replace(/\{\{sea\}\}/g, String(data.sea || 0))
+          .replace(/\{\{time\}\}/g, new Date().toISOString())
         return JSON.parse(str)
     } catch { return null }
 }
@@ -508,9 +646,28 @@ function injectWebhookData(template, data) {
 const sendWebhook = async (url, data, custom) => {
     try {
         const payload = custom
-            ? (injectWebhookData(custom, data) || { content: `Job: ${data.job} | Boss: ${data.boss} | Players: ${data.players} | Sea: ${data.sea}` })
-            : { embeds: [{ title: "New Job Added", color: 65280, fields: [{ name: "Boss", value: String(data.boss), inline: true }, { name: "Players", value: String(data.players), inline: true }, { name: "Sea", value: String(data.sea), inline: true }, { name: "JobId", value: String(data.job).slice(0, 1000) }], timestamp: new Date().toISOString() }] }
-        await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload), signal: AbortSignal.timeout(8000) })
+            ? (injectWebhookData(custom, data) || { 
+                content: `Job: ${data.job} | Boss: ${data.boss} | Players: ${data.players} | Sea: ${data.sea}` 
+              })
+            : { 
+                embeds: [{ 
+                    title: "New Job Added", 
+                    color: 65280, 
+                    fields: [
+                        { name: "Boss", value: String(data.boss), inline: true }, 
+                        { name: "Players", value: String(data.players), inline: true }, 
+                        { name: "Sea", value: String(data.sea), inline: true }, 
+                        { name: "JobId", value: String(data.job).slice(0, 1000) }
+                    ], 
+                    timestamp: new Date().toISOString() 
+                }] 
+              }
+        await fetch(url, { 
+            method: "POST", 
+            headers: { "Content-Type": "application/json" }, 
+            body: JSON.stringify(payload), 
+            signal: AbortSignal.timeout(8000) 
+        })
     } catch {}
 }
 
@@ -520,18 +677,39 @@ const applyJobLimits = api => {
         for (let b in api.jobs) total += api.jobs[b].length
         while (total > api.maxTotalJobs) {
             let oldestBoss = null, oldestTime = Infinity
-            for (let b in api.jobs) { if (api.jobs[b].length && api.jobs[b][0].t < oldestTime) { oldestTime = api.jobs[b][0].t; oldestBoss = b } }
-            if (oldestBoss) { api.jobs[oldestBoss].shift(); total--; if (!api.jobs[oldestBoss].length) delete api.jobs[oldestBoss] }
-            else break
+            for (let b in api.jobs) { 
+                if (api.jobs[b].length && api.jobs[b][0].t < oldestTime) { 
+                    oldestTime = api.jobs[b][0].t
+                    oldestBoss = b 
+                } 
+            }
+            if (oldestBoss) { 
+                api.jobs[oldestBoss].shift()
+                total--
+                if (!api.jobs[oldestBoss].length) delete api.jobs[oldestBoss] 
+            } else break
         }
     }
-    if (api.maxJobsPerBoss > 0) { for (let b in api.jobs) while (api.jobs[b].length > api.maxJobsPerBoss) api.jobs[b].shift() }
+    if (api.maxJobsPerBoss > 0) { 
+        for (let b in api.jobs) {
+            while (api.jobs[b].length > api.maxJobsPerBoss) {
+                api.jobs[b].shift()
+            }
+        }
+    }
 }
 
 const cleanExpiredJobs = api => {
     const t = now()
-    Object.keys(api.jobs).forEach(boss => { api.jobs[boss] = api.jobs[boss].filter(j => t - j.t < api.ttl); if (!api.jobs[boss].length) delete api.jobs[boss] })
+    Object.keys(api.jobs).forEach(boss => { 
+        api.jobs[boss] = api.jobs[boss].filter(j => t - j.t < api.ttl)
+        if (!api.jobs[boss].length) delete api.jobs[boss] 
+    })
 }
+
+// ============================================================
+// MONITOR FUNCTIONS
+// ============================================================
 
 async function checkMonitor(m) {
     const old = m.lastStatus
@@ -539,7 +717,11 @@ async function checkMonitor(m) {
     try {
         await new Promise((resolve, reject) => {
             const lib = m.url.startsWith("https") ? https : http
-            const req = lib.request(m.url, { method: "GET", timeout: 15000 }, res => { m.lastCode = res.statusCode; res.resume(); resolve() })
+            const req = lib.request(m.url, { method: "GET", timeout: 15000 }, res => { 
+                m.lastCode = res.statusCode
+                res.resume()
+                resolve() 
+            })
             req.on("error", reject)
             req.on("timeout", () => { req.destroy(); reject(new Error("timeout")) })
             req.end()
@@ -548,7 +730,10 @@ async function checkMonitor(m) {
         m.goodChecks = (m.goodChecks || 0) + 1
         m.uptime = ((m.goodChecks / m.totalChecks) * 100).toFixed(2)
         m.lastPing = now() - start
-        m.lastStatus = "online"; m.lastError = null; m.lastCheck = now(); m.retry = 0
+        m.lastStatus = "online"
+        m.lastError = null
+        m.lastCheck = now()
+        m.retry = 0
         m.history = m.history || []
         m.history.push({ t: now(), s: "on", p: m.lastPing })
         if (m.history.length > MAX_MONITOR_HISTORY) m.history.shift()
@@ -558,7 +743,9 @@ async function checkMonitor(m) {
         if (m.retry < 3) return
         m.totalChecks = (m.totalChecks || 0) + 1
         m.uptime = (((m.goodChecks || 0) / m.totalChecks) * 100).toFixed(2)
-        m.lastStatus = "offline"; m.lastError = err.message || String(err); m.lastCheck = now()
+        m.lastStatus = "offline"
+        m.lastError = err.message || String(err)
+        m.lastCheck = now()
         m.history = m.history || []
         m.history.push({ t: now(), s: "off", p: 0 })
         if (m.history.length > MAX_MONITOR_HISTORY) m.history.shift()
@@ -570,12 +757,29 @@ async function checkMonitor(m) {
 async function sendMonitorWebhook(m, type) {
     try {
         await fetch(m.webhook, {
-            method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ embeds: [{ title: type === "up" ? "🟢 Online" : "🔴 Offline", color: type === "up" ? 65280 : 16711680, fields: [{ name: "Name", value: m.name, inline: true }, { name: "URL", value: m.url, inline: true }, { name: "Uptime", value: m.uptime + "%", inline: true }, { name: "Ping", value: (m.lastPing || 0) + "ms", inline: true }], timestamp: new Date().toISOString() }] }),
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ 
+                embeds: [{ 
+                    title: type === "up" ? "🟢 Online" : "🔴 Offline", 
+                    color: type === "up" ? 65280 : 16711680, 
+                    fields: [
+                        { name: "Name", value: m.name, inline: true }, 
+                        { name: "URL", value: m.url, inline: true }, 
+                        { name: "Uptime", value: m.uptime + "%", inline: true }, 
+                        { name: "Ping", value: (m.lastPing || 0) + "ms", inline: true }
+                    ], 
+                    timestamp: new Date().toISOString() 
+                }] 
+            }),
             signal: AbortSignal.timeout(8000)
         })
     } catch {}
 }
+
+// ============================================================
+// BOT FUNCTIONS
+// ============================================================
 
 function spawnBot(bot) {
     if (activeProcesses.has(bot.id)) return
@@ -583,8 +787,11 @@ function spawnBot(bot) {
     const tmpFile = `/tmp/bot_${bot.id}.py`
     fs.writeFileSync(tmpFile, code)
     const child = spawn("python3", [tmpFile], { env: { ...process.env, ...bot.env } })
-    bot.pid = child.pid; bot.status = "running"; bot.updated_at = now()
+    bot.pid = child.pid
+    bot.status = "running"
+    bot.updated_at = now()
     activeProcesses.set(bot.id, child)
+    
     const appendLog = data => {
         const lines = String(data).split("\n").filter(Boolean)
         bot.logs.push(...lines)
@@ -595,10 +802,14 @@ function spawnBot(bot) {
     child.stderr.on("data", data => appendLog("[ERR] " + data))
     child.on("close", (exitCode, signal) => {
         activeProcesses.delete(bot.id)
-        bot.pid = null; bot.updated_at = now()
+        bot.pid = null
+        bot.updated_at = now()
         bot.logs.push(`[EXIT] code=${exitCode} signal=${signal}`)
         const currentBot = DB.bots[bot.id]
-        if (!currentBot) { try { fs.unlinkSync(tmpFile) } catch {} return }
+        if (!currentBot) { 
+            try { fs.unlinkSync(tmpFile) } catch {} 
+            return 
+        }
         if (currentBot.autoRestart && (currentBot.restartCount || 0) < BOT_MAX_RESTARTS) {
             currentBot.status = "restarting"
             currentBot.restartCount = (currentBot.restartCount || 0) + 1
@@ -622,22 +833,92 @@ function spawnBot(bot) {
         }
         try { fs.unlinkSync(tmpFile) } catch {}
     })
-    child.on("error", err => { bot.status = "error"; bot.logs.push("[ERROR] " + err.message); activeProcesses.delete(bot.id); saveDB() })
+    child.on("error", err => { 
+        bot.status = "error"
+        bot.logs.push("[ERROR] " + err.message)
+        activeProcesses.delete(bot.id)
+        saveDB() 
+    })
 }
 
+// ============================================================
+// SCHEDULED TASKS
+// ============================================================
+
 setInterval(() => {
-    Object.values(DB.apis).forEach(api => { cleanExpiredJobs(api); applyJobLimits(api) })
-    Object.values(DB.monitors).forEach(m => { if (now() - (m.lastCheck || 0) >= (m.interval || 60000)) checkMonitor(m) })
+    Object.values(DB.apis).forEach(api => { 
+        cleanExpiredJobs(api)
+        applyJobLimits(api) 
+    })
+    Object.values(DB.monitors).forEach(m => { 
+        if (now() - (m.lastCheck || 0) >= (m.interval || 60000)) {
+            checkMonitor(m) 
+        }
+    })
     saveDB()
 }, 15000)
 
 setInterval(() => writeDB(), 450000)
 
-process.on("SIGTERM", async () => { await writeDB(); process.exit(0) })
-process.on("SIGINT", async () => { await writeDB(); process.exit(0) })
-process.on("uncaughtException", async err => { await writeDB() })
+// ============================================================
+// PROCESS HANDLERS
+// ============================================================
 
-const upload = multer({ dest: "/tmp/bot_uploads/", limits: { fileSize: 5 * 1024 * 1024 } })
+process.on("SIGTERM", async () => { 
+    console.log('📦 Saving database before shutdown...')
+    await writeDB()
+    process.exit(0) 
+})
+
+process.on("SIGINT", async () => { 
+    console.log('📦 Saving database before shutdown...')
+    await writeDB()
+    process.exit(0) 
+})
+
+process.on("uncaughtException", async err => { 
+    console.error('❌ Uncaught Exception:', err)
+    await writeDB() 
+})
+
+process.on("unhandledRejection", (err) => {
+    console.error('❌ Unhandled Rejection:', err)
+})
+
+const upload = multer({ 
+    dest: "/tmp/bot_uploads/", 
+    limits: { fileSize: 5 * 1024 * 1024 } 
+})
+
+// ============================================================
+// ROUTES
+// ============================================================
+
+app.get("/", (req, res) => {
+    res.json({
+        name: "AuraHub API",
+        version: "1.0.0",
+        status: "running",
+        endpoints: {
+            register: "/register",
+            login: "/login",
+            health: "/health",
+            apis: "/my",
+            push: "/push"
+        }
+    })
+})
+
+app.get("/health", (req, res) => {
+    res.json({
+        status: "ok",
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        memory: process.memoryUsage(),
+        github: isGitHubAvailable() ? "available" : "unavailable",
+        token: OWNER_TOKEN ? "set" : "not set"
+    })
+})
 
 app.post("/register", async (req, res) => {
     let { user, pass } = req.body
@@ -647,33 +928,44 @@ app.post("/register", async (req, res) => {
     if (DB.users[user]) return res.json({ err: "tai khoan da ton tai" })
     const isFirst = Object.keys(DB.users).length === 0
     DB.users[user] = { pass, createdAt: now(), role: isFirst ? "owner" : "member", avatar: "" }
-    await saveDB(); res.json({ ok: 1 })
+    await saveDB()
+    res.json({ ok: 1 })
 })
 
 app.post("/login", async (req, res) => {
     let { user, pass } = req.body
+    // Login with OWNER_TOKEN
     if (pass === OWNER_TOKEN) {
         let token = genToken()
         if (!DB.users[user]) DB.users[user] = { pass: null, createdAt: now(), role: "owner", avatar: "" }
         DB.sessions[token] = { user, role: "OWNER" }
-        await saveDB(); return res.json({ token, role: "owner" })
+        await saveDB()
+        return res.json({ token, role: "owner" })
     }
+    // Normal login
     let u = DB.users[user]
     if (!u || u.pass !== pass) return res.json({ err: "sai thong tin" })
     let token = genToken()
     DB.sessions[token] = { user, role: "user" }
-    await saveDB(); res.json({ token, role: u.role || "member" })
+    await saveDB()
+    res.json({ token, role: u.role || "member" })
 })
 
 app.post("/logout", async (req, res) => {
     const token = req.headers.authorization
-    if (token && DB.sessions[token]) { delete DB.sessions[token]; await saveDB(); res.json({ ok: 1 }) }
-    else res.json({ err: "khong co phien" })
+    if (token && DB.sessions[token]) { 
+        delete DB.sessions[token]
+        await saveDB()
+        res.json({ ok: 1 }) 
+    } else res.json({ err: "khong co phien" })
 })
 
 app.get("/me", (req, res) => {
     let s = getSession(req)
-    if (s) { const u = DB.users[s.user]; return res.json({ user: s.user, role: getRole(req), avatar: u?.avatar || "" }) }
+    if (s) { 
+        const u = DB.users[s.user]
+        return res.json({ user: s.user, role: getRole(req), avatar: u?.avatar || "" }) 
+    }
     res.json({ guest: genGuest(getIP(req)), role: "guest", avatar: "" })
 })
 
@@ -684,7 +976,8 @@ app.post("/set-avatar", async (req, res) => {
     if (typeof avatar !== "string" || avatar.length > 300) return res.json({ err: "avatar khong hop le" })
     DB.users[user] = DB.users[user] || { pass: null, createdAt: now(), role: "member", avatar: "" }
     DB.users[user].avatar = avatar
-    await saveDB(); res.json({ ok: 1, avatar })
+    await saveDB()
+    res.json({ ok: 1, avatar })
 })
 
 app.post("/change-password", async (req, res) => {
@@ -695,7 +988,9 @@ app.post("/change-password", async (req, res) => {
     if (!u) return res.json({ err: "khong tim thay" })
     if (u.pass && u.pass !== oldPass) return res.json({ err: "sai mat khau hien tai" })
     if (!newPass || newPass.length < 8) return res.json({ err: "mat khau moi qua ngan" })
-    u.pass = newPass; await saveDB(); res.json({ ok: 1 })
+    u.pass = newPass
+    await saveDB()
+    res.json({ ok: 1 })
 })
 
 app.get("/user/:username", (req, res) => {
@@ -711,8 +1006,31 @@ app.post("/create", async (req, res) => {
     if (!name) return res.json({ err: "thieu ten API" })
     if (/[^\w]/.test(name)) return res.json({ err: "ten API chi duoc chua chu, so, _" })
     let id = genID()
-    DB.apis[id] = { id, name, displayName: displayName || name, owner: user, jobs: {}, webhook: webhook || "", webhookCustom: globalDefaults.webhookCustom, encode: globalDefaults.encode, prefix: globalDefaults.prefix, suffix: globalDefaults.suffix, ttl: globalDefaults.ttl, removeDuplicate: globalDefaults.removeDuplicate, maxJobsPerBoss: globalDefaults.maxJobsPerBoss, maxTotalJobs: globalDefaults.maxTotalJobs, enabled: true, privateMode: privateMode !== undefined ? toBool(privateMode) : globalDefaults.privateMode, viewIP: viewIP || "", whitelistIPs: whitelistIPs || [...(globalDefaults.whitelistIPs || [])], jobSort: globalDefaults.jobSort, customFields: globalDefaults.customFields ? [...globalDefaults.customFields] : null, apiKey: genToken() }
-    await saveDB(); res.json({ ok: 1, id, apiKey: DB.apis[id].apiKey, link: `/api/${id}/all` })
+    DB.apis[id] = { 
+        id, 
+        name, 
+        displayName: displayName || name, 
+        owner: user, 
+        jobs: {}, 
+        webhook: webhook || "", 
+        webhookCustom: globalDefaults.webhookCustom, 
+        encode: globalDefaults.encode, 
+        prefix: globalDefaults.prefix, 
+        suffix: globalDefaults.suffix, 
+        ttl: globalDefaults.ttl, 
+        removeDuplicate: globalDefaults.removeDuplicate, 
+        maxJobsPerBoss: globalDefaults.maxJobsPerBoss, 
+        maxTotalJobs: globalDefaults.maxTotalJobs, 
+        enabled: true, 
+        privateMode: privateMode !== undefined ? toBool(privateMode) : globalDefaults.privateMode, 
+        viewIP: viewIP || "", 
+        whitelistIPs: whitelistIPs || [...(globalDefaults.whitelistIPs || [])], 
+        jobSort: globalDefaults.jobSort, 
+        customFields: globalDefaults.customFields ? [...globalDefaults.customFields] : null, 
+        apiKey: genToken() 
+    }
+    await saveDB()
+    res.json({ ok: 1, id, apiKey: DB.apis[id].apiKey, link: `/api/${id}/all` })
 })
 
 app.get("/my", (req, res) => {
@@ -720,15 +1038,41 @@ app.get("/my", (req, res) => {
     if (!user) return res.json([])
     const apis = isAdminOrOwner(req) ? Object.values(DB.apis) : Object.values(DB.apis).filter(a => a.owner === user)
     res.json(apis.map(api => {
-        const bossCounts = {}; let total = 0
-        for (let b in api.jobs) { bossCounts[b] = api.jobs[b].length; total += api.jobs[b].length }
-        return { id: api.id, displayName: api.displayName, name: api.name, owner: api.owner, totalJobs: total, bosses: bossCounts, enabled: api.enabled, privateMode: api.privateMode, ttl: api.ttl, webhook: !!api.webhook, encode: !!api.encode, prefix: api.prefix || "", suffix: api.suffix || "", removeDuplicate: !!api.removeDuplicate, jobSort: api.jobSort, maxJobsPerBoss: api.maxJobsPerBoss, maxTotalJobs: api.maxTotalJobs, whitelistIPs: api.whitelistIPs || [], customFields: api.customFields || null, viewIP: api.viewIP || "", apiKey: api.apiKey }
+        const bossCounts = {}
+        let total = 0
+        for (let b in api.jobs) { 
+            bossCounts[b] = api.jobs[b].length
+            total += api.jobs[b].length 
+        }
+        return { 
+            id: api.id, 
+            displayName: api.displayName, 
+            name: api.name, 
+            owner: api.owner, 
+            totalJobs: total, 
+            bosses: bossCounts, 
+            enabled: api.enabled, 
+            privateMode: api.privateMode, 
+            ttl: api.ttl, 
+            webhook: !!api.webhook, 
+            encode: !!api.encode, 
+            prefix: api.prefix || "", 
+            suffix: api.suffix || "", 
+            removeDuplicate: !!api.removeDuplicate, 
+            jobSort: api.jobSort, 
+            maxJobsPerBoss: api.maxJobsPerBoss, 
+            maxTotalJobs: api.maxTotalJobs, 
+            whitelistIPs: api.whitelistIPs || [], 
+            customFields: api.customFields || null, 
+            viewIP: api.viewIP || "", 
+            apiKey: api.apiKey 
+        }
     }))
 })
 
-// ========================================================
-// ============ PUSH ENDPOINTS WITH OBFUSCATE ============
-// ========================================================
+// ============================================================
+// PUSH ENDPOINTS WITH OBFUSCATE
+// ============================================================
 
 app.post("/push", async (req, res) => {
     let { id, apiKey, job, players, sea, boss } = req.body
@@ -740,11 +1084,11 @@ app.post("/push", async (req, res) => {
     if (!boss) return res.json({ err: "thieu boss" })
     boss = String(boss).toLowerCase().trim()
     
-    // Obfuscate job với tỷ lệ 100%
-    const originalJob = job;
-    const obfuscateRate = 100;
-    const obfResult = obfuscate(job, obfuscateRate);
-    job = obfResult.obfuscated;
+    // Obfuscate job
+    const originalJob = job
+    const obfuscateRate = 100
+    const obfResult = obfuscate(job, obfuscateRate)
+    job = obfResult.obfuscated
     
     let finalJob = encode(job, api.encode)
     if (api.prefix) finalJob = api.prefix + finalJob
@@ -752,12 +1096,20 @@ app.post("/push", async (req, res) => {
     if (!api.jobs[boss]) api.jobs[boss] = []
     if (toBool(api.removeDuplicate)) {
         let ex = api.jobs[boss].find(j => j.job === finalJob)
-        if (ex) { ex.players = Number(players) || 0; ex.sea = Number(sea) || 0; ex.t = now(); applyJobLimits(api); await saveDB(); return res.json({ ok: 1, update: true }) }
+        if (ex) { 
+            ex.players = Number(players) || 0
+            ex.sea = Number(sea) || 0
+            ex.t = now()
+            applyJobLimits(api)
+            await saveDB()
+            return res.json({ ok: 1, update: true }) 
+        }
     }
     let data = { job: finalJob, players: Number(players) || 0, sea: Number(sea) || 0, boss, t: now() }
-    api.jobs[boss].push(data); applyJobLimits(api)
+    api.jobs[boss].push(data)
+    applyJobLimits(api)
     if (api.webhook) sendWebhook(api.webhook, data, api.webhookCustom)
-    await saveDB(); 
+    await saveDB()
     res.json({ 
         ok: 1, 
         original: originalJob, 
@@ -776,34 +1128,47 @@ app.post("/push/bulk", async (req, res) => {
     if (api.apiKey !== apiKey) return res.json({ err: "sai key" })
     if (!Array.isArray(jobs) || !jobs.length) return res.json({ err: "mang jobs rong" })
     let added = 0, dup = toBool(api.removeDuplicate)
-    const obfuscatedJobs = [];
-    const obfuscateRate = 40;
+    const obfuscatedJobs = []
+    const obfuscateRate = 40
     
     for (let item of jobs) {
         let { job, players, sea, boss } = item
         if (!job || !boss) continue
         boss = String(boss).toLowerCase().trim()
-        
-        // Obfuscate job
-        const originalJob = job;
-        const obfResult = obfuscate(job, obfuscateRate);
-        job = obfResult.obfuscated;
-        
+        const originalJob = job
+        const obfResult = obfuscate(job, obfuscateRate)
+        job = obfResult.obfuscated
         let finalJob = encode(job, api.encode)
         if (api.prefix) finalJob = api.prefix + finalJob
         if (api.suffix) finalJob = finalJob + api.suffix
         if (!api.jobs[boss]) api.jobs[boss] = []
-        if (dup) { let ex = api.jobs[boss].find(j => j.job === finalJob); if (ex) { ex.players = Number(players) || 0; ex.sea = Number(sea) || 0; ex.t = now(); added++; continue } }
-        api.jobs[boss].push({ job: finalJob, players: Number(players) || 0, sea: Number(sea) || 0, boss, t: now() })
+        if (dup) { 
+            let ex = api.jobs[boss].find(j => j.job === finalJob)
+            if (ex) { 
+                ex.players = Number(players) || 0
+                ex.sea = Number(sea) || 0
+                ex.t = now()
+                added++
+                continue 
+            } 
+        }
+        api.jobs[boss].push({ 
+            job: finalJob, 
+            players: Number(players) || 0, 
+            sea: Number(sea) || 0, 
+            boss, 
+            t: now() 
+        })
         added++
         obfuscatedJobs.push({ 
             original: originalJob, 
             obfuscated: finalJob,
             obfCount: obfResult.obfCount
-        });
+        })
         if (api.webhook) sendWebhook(api.webhook, { job: finalJob, players, sea, boss }, api.webhookCustom)
     }
-    applyJobLimits(api); await saveDB(); 
+    applyJobLimits(api)
+    await saveDB()
     res.json({ 
         ok: 1, 
         added, 
@@ -812,9 +1177,9 @@ app.post("/push/bulk", async (req, res) => {
     })
 })
 
-// ========================================================
-// ============ END PUSH ENDPOINTS ============
-// ========================================================
+// ============================================================
+// API ENDPOINTS
+// ============================================================
 
 const checkView = (req, api) => {
     if (!api.privateMode) return true
@@ -827,7 +1192,9 @@ const checkView = (req, api) => {
 const filterJobFields = (job, fields) => {
     if (!fields || !fields.length) return job
     const f = {}
-    fields.forEach(k => { if (Object.prototype.hasOwnProperty.call(job, k)) f[k] = job[k] })
+    fields.forEach(k => { 
+        if (Object.prototype.hasOwnProperty.call(job, k)) f[k] = job[k] 
+    })
     return f
 }
 
@@ -835,41 +1202,78 @@ app.get("/api/:id/stats", (req, res) => {
     let api = DB.apis[req.params.id]
     if (!api) return res.json({ err: "api khong ton tai" })
     if (!isAdminOrOwner(req) && api.owner !== getUser(req)) return res.json({ err: "khong co quyen" })
-    cleanExpiredJobs(api); applyJobLimits(api)
-    const bossCounts = {}; let total = 0
-    for (let b in api.jobs) { bossCounts[b] = api.jobs[b].length; total += api.jobs[b].length }
-    res.json({ id: api.id, displayName: api.displayName, totalJobs: total, maxJobsPerBoss: api.maxJobsPerBoss, maxTotalJobs: api.maxTotalJobs, bosses: bossCounts, enabled: api.enabled, ttl: api.ttl, privateMode: api.privateMode, removeDuplicate: !!api.removeDuplicate })
+    cleanExpiredJobs(api)
+    applyJobLimits(api)
+    const bossCounts = {}
+    let total = 0
+    for (let b in api.jobs) { 
+        bossCounts[b] = api.jobs[b].length
+        total += api.jobs[b].length 
+    }
+    res.json({ 
+        id: api.id, 
+        displayName: api.displayName, 
+        totalJobs: total, 
+        maxJobsPerBoss: api.maxJobsPerBoss, 
+        maxTotalJobs: api.maxTotalJobs, 
+        bosses: bossCounts, 
+        enabled: api.enabled, 
+        ttl: api.ttl, 
+        privateMode: api.privateMode, 
+        removeDuplicate: !!api.removeDuplicate 
+    })
 })
 
 app.get("/api/:id/:boss?", (req, res) => {
     let api = DB.apis[req.params.id]
     if (!api) return res.json([])
     if (!checkView(req, api)) return res.json({ err: "thieu IP duoc phep" })
-    cleanExpiredJobs(api); applyJobLimits(api)
+    cleanExpiredJobs(api)
+    applyJobLimits(api)
     let boss = (req.params.boss || "all").toLowerCase()
     let sortOrder = (req.query.sort || api.jobSort || "desc") === "asc" ? 1 : -1
     let page = Math.max(1, parseInt(req.query.page) || 1)
     let limit = Math.min(500, Math.max(1, parseInt(req.query.limit) || 50))
     let group = req.query.group === "true"
     if (boss === "stats") return res.json({ err: "dung /api/:id/stats" })
-    const resp = { api: { id: api.id, name: api.displayName, owner: api.owner, ttl: api.ttl, encode: !!api.encode, totalJobs: 0 }, jobs: group ? {} : [] }
+    const resp = { 
+        api: { 
+            id: api.id, 
+            name: api.displayName, 
+            owner: api.owner, 
+            ttl: api.ttl, 
+            encode: !!api.encode, 
+            totalJobs: 0 
+        }, 
+        jobs: group ? {} : [] 
+    }
     if (boss !== "all") {
         let jobs = (api.jobs[boss] || []).sort((a, b) => sortOrder * (b.t - a.t))
         resp.api.totalJobs = jobs.length
         const sliced = jobs.slice((page - 1) * limit, page * limit).map(j => filterJobFields(j, api.customFields))
-        if (group) resp.jobs[boss] = sliced; else resp.jobs = sliced
-        resp.page = page; resp.totalPages = Math.ceil(jobs.length / limit)
+        if (group) resp.jobs[boss] = sliced
+        else resp.jobs = sliced
+        resp.page = page
+        resp.totalPages = Math.ceil(jobs.length / limit)
     } else {
         if (group) {
             let total = 0
-            for (let b in api.jobs) { resp.jobs[b] = [...api.jobs[b]].sort((a, bb) => sortOrder * (bb.t - a.t)).map(j => filterJobFields(j, api.customFields)); total += api.jobs[b].length }
+            for (let b in api.jobs) { 
+                resp.jobs[b] = [...api.jobs[b]].sort((a, bb) => sortOrder * (bb.t - a.t)).map(j => filterJobFields(j, api.customFields))
+                total += api.jobs[b].length 
+            }
             resp.api.totalJobs = total
         } else {
             let all = [], total = 0
-            for (let b in api.jobs) { total += api.jobs[b].length; all.push(...api.jobs[b].map(j => ({ ...j, boss: b }))) }
+            for (let b in api.jobs) { 
+                total += api.jobs[b].length
+                all.push(...api.jobs[b].map(j => ({ ...j, boss: b }))) 
+            }
             all.sort((a, b) => sortOrder * (b.t - a.t))
-            resp.api.totalJobs = total; resp.jobs = all.slice((page - 1) * limit, page * limit).map(j => filterJobFields(j, api.customFields))
-            resp.page = page; resp.totalPages = Math.ceil(total / limit)
+            resp.api.totalJobs = total
+            resp.jobs = all.slice((page - 1) * limit, page * limit).map(j => filterJobFields(j, api.customFields))
+            resp.page = page
+            resp.totalPages = Math.ceil(total / limit)
         }
     }
     res.json(resp)
@@ -886,15 +1290,18 @@ app.delete("/api/:id/job", async (req, res) => {
     if (index !== undefined) {
         let i = parseInt(index)
         if (isNaN(i) || i < 0 || i >= api.jobs[boss].length) return res.json({ err: "index khong hop le" })
-        api.jobs[boss].splice(i, 1); if (!api.jobs[boss].length) delete api.jobs[boss]
-        await saveDB(); return res.json({ ok: 1 })
+        api.jobs[boss].splice(i, 1)
+        if (!api.jobs[boss].length) delete api.jobs[boss]
+        await saveDB()
+        return res.json({ ok: 1 })
     }
     if (job) {
         const before = api.jobs[boss].length
         api.jobs[boss] = api.jobs[boss].filter(j => j.job !== job)
         if (!api.jobs[boss].length) delete api.jobs[boss]
         if ((api.jobs[boss]?.length ?? 0) === before) return res.json({ err: "khong tim thay job" })
-        await saveDB(); return res.json({ ok: 1 })
+        await saveDB()
+        return res.json({ ok: 1 })
     }
     res.json({ err: "can job hoac index" })
 })
@@ -904,15 +1311,19 @@ app.delete("/api/:id/clear", async (req, res) => {
     if (!api) return res.json({ err: "api khong ton tai" })
     if (!isAdminOrOwner(req) && api.owner !== user) return res.json({ err: "khong co quyen" })
     let { boss } = req.body
-    if (boss) delete api.jobs[boss.toLowerCase()]; else api.jobs = {}
-    await saveDB(); res.json({ ok: 1 })
+    if (boss) delete api.jobs[boss.toLowerCase()]
+    else api.jobs = {}
+    await saveDB()
+    res.json({ ok: 1 })
 })
 
 app.delete("/api/:id", async (req, res) => {
     let user = getUser(req), api = DB.apis[req.params.id]
     if (!api) return res.json({ err: "api khong ton tai" })
     if (!isAdminOrOwner(req) && api.owner !== user) return res.json({ err: "khong co quyen" })
-    delete DB.apis[req.params.id]; await saveDB(); res.json({ ok: 1 })
+    delete DB.apis[req.params.id]
+    await saveDB()
+    res.json({ ok: 1 })
 })
 
 app.post("/settings", async (req, res) => {
@@ -937,7 +1348,9 @@ app.post("/settings", async (req, res) => {
     if (jobSort !== undefined && ["asc", "desc"].includes(jobSort)) api.jobSort = jobSort
     if (customFields !== undefined) api.customFields = Array.isArray(customFields) ? customFields : null
     if (webhookCustom !== undefined) api.webhookCustom = webhookCustom
-    applyJobLimits(api); await saveDB(); res.json({ ok: 1 })
+    applyJobLimits(api)
+    await saveDB()
+    res.json({ ok: 1 })
 })
 
 app.put("/api/:id/rename", async (req, res) => {
@@ -980,14 +1393,25 @@ app.post("/owner/edit", async (req, res) => {
     if (jobSort !== undefined && ["asc", "desc"].includes(jobSort)) api.jobSort = jobSort
     if (customFields !== undefined) api.customFields = Array.isArray(customFields) ? customFields : null
     if (webhookCustom !== undefined) api.webhookCustom = webhookCustom
-    applyJobLimits(api); await saveDB(); res.json({ ok: 1 })
+    applyJobLimits(api)
+    await saveDB()
+    res.json({ ok: 1 })
 })
 
 app.get("/owner/stats", (req, res) => {
     if (!isOwner(req)) return res.json({ err: "khong phai owner" })
     let totalJobs = 0
     Object.values(DB.apis).forEach(api => Object.values(api.jobs).forEach(arr => totalJobs += arr.length))
-    res.json({ totalApis: Object.keys(DB.apis).length, totalJobs, totalUsers: Object.keys(DB.users).length, activeSessions: Object.keys(DB.sessions).length, totalBots: Object.keys(DB.bots).length, runningBots: Object.values(DB.bots).filter(b => b.status === "running").length, totalMonitors: Object.keys(DB.monitors).length, onlineMonitors: Object.values(DB.monitors).filter(m => m.lastStatus === "online").length })
+    res.json({ 
+        totalApis: Object.keys(DB.apis).length, 
+        totalJobs, 
+        totalUsers: Object.keys(DB.users).length, 
+        activeSessions: Object.keys(DB.sessions).length, 
+        totalBots: Object.keys(DB.bots).length, 
+        runningBots: Object.values(DB.bots).filter(b => b.status === "running").length, 
+        totalMonitors: Object.keys(DB.monitors).length, 
+        onlineMonitors: Object.values(DB.monitors).filter(m => m.lastStatus === "online").length 
+    })
 })
 
 app.post("/owner/global-settings", async (req, res) => {
@@ -1006,7 +1430,8 @@ app.post("/owner/global-settings", async (req, res) => {
     if (jobSort !== undefined && ["asc", "desc"].includes(jobSort)) globalDefaults.jobSort = jobSort
     if (customFields !== undefined) globalDefaults.customFields = Array.isArray(customFields) ? customFields : null
     if (webhookCustom !== undefined) globalDefaults.webhookCustom = webhookCustom
-    await saveDB(); res.json({ ok: 1, globalDefaults })
+    await saveDB()
+    res.json({ ok: 1, globalDefaults })
 })
 
 app.get("/owner/global-settings", (req, res) => {
@@ -1018,7 +1443,9 @@ app.post("/owner/reset-api-key", async (req, res) => {
     if (!isOwner(req)) return res.json({ err: "khong phai owner" })
     let api = DB.apis[req.body.id]
     if (!api) return res.json({ err: "api khong ton tai" })
-    api.apiKey = genToken(); await saveDB(); res.json({ ok: 1, apiKey: api.apiKey })
+    api.apiKey = genToken()
+    await saveDB()
+    res.json({ ok: 1, apiKey: api.apiKey })
 })
 
 app.post("/owner/change-owner", async (req, res) => {
@@ -1027,13 +1454,19 @@ app.post("/owner/change-owner", async (req, res) => {
     let api = DB.apis[id]
     if (!api) return res.json({ err: "api khong ton tai" })
     if (!newOwner || !DB.users[newOwner]) return res.json({ err: "nguoi dung khong ton tai" })
-    api.owner = newOwner; await saveDB(); res.json({ ok: 1 })
+    api.owner = newOwner
+    await saveDB()
+    res.json({ ok: 1 })
 })
 
 app.post("/owner/clean-all-expired", async (req, res) => {
     if (!isAdminOrOwner(req)) return res.json({ err: "khong phai admin hoac owner" })
-    Object.values(DB.apis).forEach(api => { cleanExpiredJobs(api); applyJobLimits(api) })
-    await saveDB(); res.json({ ok: 1 })
+    Object.values(DB.apis).forEach(api => { 
+        cleanExpiredJobs(api)
+        applyJobLimits(api) 
+    })
+    await saveDB()
+    res.json({ ok: 1 })
 })
 
 app.post("/owner/set-role", async (req, res) => {
@@ -1041,12 +1474,19 @@ app.post("/owner/set-role", async (req, res) => {
     let { user, role } = req.body
     if (!user || !role || !DB.users[user]) return res.json({ err: "thieu thong tin hoac user khong ton tai" })
     if (!["member", "admin"].includes(role)) return res.json({ err: "role khong hop le" })
-    DB.users[user].role = role; await saveDB(); res.json({ ok: 1, user, newRole: role })
+    DB.users[user].role = role
+    await saveDB()
+    res.json({ ok: 1, user, newRole: role })
 })
 
 app.get("/admin/users", (req, res) => {
     if (!isAdminOrOwner(req)) return res.json({ err: "khong phai admin hoac owner" })
-    res.json(Object.entries(DB.users).map(([username, data]) => ({ username, role: data.role || "member", avatar: data.avatar || "", createdAt: data.createdAt })))
+    res.json(Object.entries(DB.users).map(([username, data]) => ({ 
+        username, 
+        role: data.role || "member", 
+        avatar: data.avatar || "", 
+        createdAt: data.createdAt 
+    })))
 })
 
 app.post("/admin/set-role", async (req, res) => {
@@ -1055,8 +1495,14 @@ app.post("/admin/set-role", async (req, res) => {
     if (!user || !role || !DB.users[user]) return res.json({ err: "thieu thong tin hoac user khong ton tai" })
     if (!["member", "admin"].includes(role)) return res.json({ err: "role khong hop le" })
     if (DB.users[user].role === "owner") return res.json({ err: "khong the thay doi role cua owner" })
-    DB.users[user].role = role; await saveDB(); res.json({ ok: 1, user, newRole: role })
+    DB.users[user].role = role
+    await saveDB()
+    res.json({ ok: 1, user, newRole: role })
 })
+
+// ============================================================
+// BOT ENDPOINTS
+// ============================================================
 
 app.post("/bot/create", upload.single("file"), async (req, res) => {
     let user = getUser(req)
@@ -1068,14 +1514,33 @@ app.post("/bot/create", upload.single("file"), async (req, res) => {
         if (existing.length >= BOT_LIMIT_USER) return res.json({ err: `Moi tai khoan chi duoc host ${BOT_LIMIT_USER} bot Discord. Xoa bot cu truoc!` })
     }
     let code = ""
-    if (req.file) { code = fs.readFileSync(req.file.path, "utf8"); fs.unlinkSync(req.file.path) }
-    else if (req.body.code) { code = req.body.code }
-    else { return res.json({ err: "can upload file .py hoac gui code" }) }
+    if (req.file) { 
+        code = fs.readFileSync(req.file.path, "utf8")
+        fs.unlinkSync(req.file.path) 
+    } else if (req.body.code) { 
+        code = req.body.code 
+    } else { 
+        return res.json({ err: "can upload file .py hoac gui code" }) 
+    }
     let envObj = {}
     try { envObj = JSON.parse(env || "{}") } catch {}
     const id = genID()
-    DB.bots[id] = { id, name, owner: user, code: Buffer.from(code).toString("base64"), env: envObj, status: "stopped", pid: null, logs: [], autoRestart: toBool(autoRestart || false), restartCount: 0, created_at: now(), updated_at: now() }
-    await saveDB(); res.json({ ok: 1, id })
+    DB.bots[id] = { 
+        id, 
+        name, 
+        owner: user, 
+        code: Buffer.from(code).toString("base64"), 
+        env: envObj, 
+        status: "stopped", 
+        pid: null, 
+        logs: [], 
+        autoRestart: toBool(autoRestart || false), 
+        restartCount: 0, 
+        created_at: now(), 
+        updated_at: now() 
+    }
+    await saveDB()
+    res.json({ ok: 1, id })
 })
 
 app.get("/bot/my", (req, res) => {
@@ -1083,7 +1548,16 @@ app.get("/bot/my", (req, res) => {
     if (!user) return res.json([])
     res.json(Object.values(DB.bots)
         .filter(b => b.owner === user || isAdminOrOwner(req))
-        .map(b => ({ id: b.id, name: b.name, status: b.status, autoRestart: b.autoRestart || false, restartCount: b.restartCount || 0, envKeys: Object.keys(b.env || {}), created_at: b.created_at, updated_at: b.updated_at })))
+        .map(b => ({ 
+            id: b.id, 
+            name: b.name, 
+            status: b.status, 
+            autoRestart: b.autoRestart || false, 
+            restartCount: b.restartCount || 0, 
+            envKeys: Object.keys(b.env || {}), 
+            created_at: b.created_at, 
+            updated_at: b.updated_at 
+        })))
 })
 
 app.post("/bot/:id/start", async (req, res) => {
@@ -1091,8 +1565,12 @@ app.post("/bot/:id/start", async (req, res) => {
     if (!bot) return res.json({ err: "bot khong ton tai" })
     if (bot.owner !== user && !isAdminOrOwner(req)) return res.json({ err: "khong co quyen" })
     if (bot.status === "running") return res.json({ err: "bot dang chay" })
-    bot.logs = []; bot.restartCount = 0; bot.autoRestart = toBool(req.body.autoRestart !== undefined ? req.body.autoRestart : bot.autoRestart)
-    spawnBot(bot); await saveDB(); res.json({ ok: 1, pid: bot.pid })
+    bot.logs = []
+    bot.restartCount = 0
+    bot.autoRestart = toBool(req.body.autoRestart !== undefined ? req.body.autoRestart : bot.autoRestart)
+    spawnBot(bot)
+    await saveDB()
+    res.json({ ok: 1, pid: bot.pid })
 })
 
 app.post("/bot/:id/stop", async (req, res) => {
@@ -1100,13 +1578,27 @@ app.post("/bot/:id/stop", async (req, res) => {
     if (!bot) return res.json({ err: "bot khong ton tai" })
     if (bot.owner !== user && !isAdminOrOwner(req)) return res.json({ err: "khong co quyen" })
     bot.autoRestart = false
-    if (bot.status !== "running" && bot.status !== "restarting" || !bot.pid) { bot.status = "stopped"; await saveDB(); return res.json({ ok: 1 }) }
+    if (bot.status !== "running" && bot.status !== "restarting" || !bot.pid) { 
+        bot.status = "stopped"
+        await saveDB()
+        return res.json({ ok: 1 }) 
+    }
     try {
         const child = activeProcesses.get(bot.id)
-        if (child) { child.kill("SIGTERM"); activeProcesses.delete(bot.id) } else process.kill(bot.pid, "SIGTERM")
-        bot.status = "stopped"; bot.pid = null; bot.updated_at = now()
-        await saveDB(); res.json({ ok: 1 })
-    } catch (e) { bot.status = "error"; await saveDB(); res.json({ err: "khong the kill: " + e.message }) }
+        if (child) { 
+            child.kill("SIGTERM")
+            activeProcesses.delete(bot.id) 
+        } else process.kill(bot.pid, "SIGTERM")
+        bot.status = "stopped"
+        bot.pid = null
+        bot.updated_at = now()
+        await saveDB()
+        res.json({ ok: 1 })
+    } catch (e) { 
+        bot.status = "error"
+        await saveDB()
+        res.json({ err: "khong the kill: " + e.message }) 
+    }
 })
 
 app.delete("/bot/:id", async (req, res) => {
@@ -1115,9 +1607,16 @@ app.delete("/bot/:id", async (req, res) => {
     if (bot.owner !== user && !isAdminOrOwner(req)) return res.json({ err: "khong co quyen" })
     bot.autoRestart = false
     if ((bot.status === "running" || bot.status === "restarting") && bot.pid) {
-        try { const child = activeProcesses.get(bot.id); if (child) child.kill("SIGKILL"); else process.kill(bot.pid, "SIGKILL"); activeProcesses.delete(bot.id) } catch {}
+        try { 
+            const child = activeProcesses.get(bot.id)
+            if (child) child.kill("SIGKILL")
+            else process.kill(bot.pid, "SIGKILL")
+            activeProcesses.delete(bot.id) 
+        } catch {}
     }
-    delete DB.bots[req.params.id]; await saveDB(); res.json({ ok: 1 })
+    delete DB.bots[req.params.id]
+    await saveDB()
+    res.json({ ok: 1 })
 })
 
 app.get("/bot/:id/logs", (req, res) => {
@@ -1139,6 +1638,10 @@ app.put("/bot/:id/rename", async (req, res) => {
     res.json({ ok: 1, name: bot.name })
 })
 
+// ============================================================
+// MONITOR ENDPOINTS
+// ============================================================
+
 app.post("/monitor/create", async (req, res) => {
     let user = getUser(req)
     if (!user) return res.json({ err: "dang nhap di" })
@@ -1146,7 +1649,25 @@ app.post("/monitor/create", async (req, res) => {
     if (!name || !url) return res.json({ err: "thieu name hoac url" })
     if (!url.startsWith("http")) return res.json({ err: "url phai bat dau bang http/https" })
     const id = genID()
-    DB.monitors[id] = { id, name, url, owner: user, interval: Math.max(30000, Number(interval) || 60000), webhook: webhook || "", lastStatus: "waiting", lastPing: 0, lastCode: 0, lastError: null, lastCheck: 0, totalChecks: 0, goodChecks: 0, uptime: "0.00", retry: 0, history: [], created_at: now() }
+    DB.monitors[id] = { 
+        id, 
+        name, 
+        url, 
+        owner: user, 
+        interval: Math.max(30000, Number(interval) || 60000), 
+        webhook: webhook || "", 
+        lastStatus: "waiting", 
+        lastPing: 0, 
+        lastCode: 0, 
+        lastError: null, 
+        lastCheck: 0, 
+        totalChecks: 0, 
+        goodChecks: 0, 
+        uptime: "0.00", 
+        retry: 0, 
+        history: [], 
+        created_at: now() 
+    }
     await saveDB()
     checkMonitor(DB.monitors[id])
     res.json({ ok: 1, id })
@@ -1162,7 +1683,9 @@ app.delete("/monitor/:id", async (req, res) => {
     let user = getUser(req), m = DB.monitors[req.params.id]
     if (!m) return res.json({ err: "monitor khong ton tai" })
     if (m.owner !== user && !isAdminOrOwner(req)) return res.json({ err: "khong co quyen" })
-    delete DB.monitors[req.params.id]; await saveDB(); res.json({ ok: 1 })
+    delete DB.monitors[req.params.id]
+    await saveDB()
+    res.json({ ok: 1 })
 })
 
 app.get("/monitor/:id", (req, res) => {
@@ -1181,6 +1704,10 @@ app.put("/monitor/:id/rename", async (req, res) => {
     await saveDB()
     res.json({ ok: 1, name: mon.name })
 })
+
+// ============================================================
+// WEBSOCKET
+// ============================================================
 
 const wss = new WebSocket.Server({ server: httpServer, path: "/ws" })
 
@@ -1208,11 +1735,35 @@ wss.on("connection", (ws, req) => {
 
 function broadcast(payload) {
     const data = JSON.stringify(payload)
-    for (const [ws] of chatClients) { try { ws.send(data) } catch {} }
+    for (const [ws] of chatClients) { 
+        try { ws.send(data) } catch {} 
+    }
 }
+
+// ============================================================
+// START SERVER
+// ============================================================
 
 ;(async () => {
     if (!fs.existsSync("/tmp/bot_uploads")) fs.mkdirSync("/tmp/bot_uploads", { recursive: true })
     await loadDB()
-    httpServer.listen(PORT, () => console.log("Server running on port " + PORT))
+    httpServer.listen(PORT, () => {
+        console.log('========================================')
+        console.log('🚀 AuraHub API Server')
+        console.log(`📍 Running on port ${PORT}`)
+        console.log(`🔐 OWNER_TOKEN: ${OWNER_TOKEN ? 'Set' : 'Not set'}`)
+        console.log(`🔗 GitHub: ${isGitHubAvailable() ? '✅ Connected' : '❌ Disabled'}`)
+        console.log('========================================')
+        console.log('📋 Available endpoints:')
+        console.log('  - /            API Info')
+        console.log('  - /health      Health Check')
+        console.log('  - /register    Register')
+        console.log('  - /login       Login')
+        console.log('  - /my          My APIs')
+        console.log('  - /push        Push Job')
+        console.log('  - /bot/*       Bot Management')
+        console.log('  - /monitor/*   Monitor Management')
+        console.log('  - /ws          WebSocket Chat')
+        console.log('========================================')
+    })
 })()
