@@ -20,10 +20,10 @@ app.use(express.static("public"))
 const PORT = process.env.PORT || 3000
 
 // ============================================================
-// ENVIRONMENT VARIABLES - FIXED
+// ENVIRONMENT VARIABLES - AUTO GENERATE IF MISSING
 // ============================================================
 
-// OWNER_TOKEN - Auto generate if not set
+// OWNER_TOKEN - Tự động tạo nếu chưa có
 if (!process.env.OWNER_TOKEN) {
     console.warn('⚠️ OWNER_TOKEN not set, generating...')
     process.env.OWNER_TOKEN = crypto.randomBytes(32).toString('hex')
@@ -32,7 +32,7 @@ if (!process.env.OWNER_TOKEN) {
 }
 const OWNER_TOKEN = process.env.OWNER_TOKEN
 
-// GITHUB_TOKEN - Check and warn if missing
+// GITHUB_TOKEN - Kiểm tra và cảnh báo nếu thiếu
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN || ''
 const GITHUB_REPO = process.env.GITHUB_REPO || ''
 const GITHUB_BRANCH = process.env.GITHUB_BRANCH || "main"
