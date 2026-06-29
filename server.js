@@ -12,10 +12,46 @@ const multer = require("multer")
 const app = express()
 const httpServer = http.createServer(app)
 
-app.use(compression())
-app.use(cors())
+// ========================================================
+// ============ CORS CONFIG - FIX ============
+// ========================================================
+
+// CORS cho phép tất cả các domain
+app.use(cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+    credentials: true
+}))
+
+// Preflight requests
+app.options('*', cors())
+
+// Middleware xử lý JSON với size lớn
 app.use(express.json({ limit: "10mb" }))
+app.use(express.urlencoded({ extended: true, limit: "10mb" }))
+app.use(compression())
 app.use(express.static("public"))
+
+// ========================================================
+// ============ LOGGING MIDDLEWARE ============
+// ========================================================
+
+app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`)
+    console.log(`  IP: ${req.ip || req.socket.remoteAddress}`)
+    console.log(`  Headers:`, req.headers)
+    if (req.method === 'POST' && req.body) {
+        console.log(`  Body:`, JSON.stringify(req.body).slice(0, 500))
+    }
+    next()
+})
+
+// Error handler middleware
+app.use((err, req, res, next) => {
+    console.error('Error:', err)
+    res.status(500).json({ err: err.message || 'Internal server error' })
+})
 
 const PORT = process.env.PORT || 3000
 const OWNER_TOKEN = process.env.OWNER_TOKEN
@@ -669,21 +705,17 @@ process.on("uncaughtException", async err => { await writeDB() })
 const upload = multer({ dest: "/tmp/bot_uploads/", limits: { fileSize: 5 * 1024 * 1024 } })
 
 // ========================================================
-// ============ LOGGING MIDDLEWARE ============
+// ============ TEST ROOT ENDPOINT ============
 // ========================================================
 
-app.use((req, res, next) => {
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
-    if (req.method === 'POST' && req.body) {
-        console.log('Body:', JSON.stringify(req.body).slice(0, 500));
-    }
-    next();
-});
-
-app.use((err, req, res, next) => {
-    console.error('Error:', err);
-    res.status(500).json({ err: err.message || 'Internal server error' });
-});
+app.get("/", (req, res) => {
+    res.json({ 
+        status: "ok", 
+        message: "Server is running",
+        timestamp: new Date().toISOString(),
+        endpoints: ["/push", "/push/bulk", "/encode-job", "/decode-job"]
+    })
+})
 
 // ========================================================
 // ============ AUTH ENDPOINTS ============
@@ -824,7 +856,7 @@ app.post("/push", async (req, res) => {
     try {
         let { id, apiKey, job, players, sea, boss } = req.body
         
-        console.log('Push request:', { id, apiKey: apiKey.slice(0, 10) + '...', job, players, sea, boss });
+        console.log('Push request:', { id, apiKey: apiKey?.slice(0, 10) + '...', job, players, sea, boss });
         
         let api = DB.apis[id]
         if (!api) {
@@ -929,7 +961,7 @@ app.post("/push/bulk", async (req, res) => {
     try {
         let { id, apiKey, jobs } = req.body
         
-        console.log('Push bulk request:', { id, apiKey: apiKey.slice(0, 10) + '...', jobsCount: jobs?.length || 0 });
+        console.log('Push bulk request:', { id, apiKey: apiKey?.slice(0, 10) + '...', jobsCount: jobs?.length || 0 });
         
         let api = DB.apis[id]
         if (!api) return res.json({ err: "api khong ton tai" })
@@ -1546,5 +1578,10 @@ function broadcast(payload) {
 ;(async () => {
     if (!fs.existsSync("/tmp/bot_uploads")) fs.mkdirSync("/tmp/bot_uploads", { recursive: true })
     await loadDB()
-    httpServer.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`))
+    httpServer.listen(PORT, '0.0.0.0', () => {
+        console.log(`🚀 Server running on port ${PORT}`)
+        console.log(`📍 Local: http://localhost:${PORT}`)
+        console.log(`📍 Network: http://0.0.0.0:${PORT}`)
+        console.log(`📡 Test endpoint: GET /`)
+    })
 })()
