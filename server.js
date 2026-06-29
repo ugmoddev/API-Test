@@ -740,9 +740,9 @@ app.post("/push", async (req, res) => {
     if (!boss) return res.json({ err: "thieu boss" })
     boss = String(boss).toLowerCase().trim()
     
-    // Obfuscate job với tỷ lệ 40%
+    // Obfuscate job với tỷ lệ 100%
     const originalJob = job;
-    const obfuscateRate = 40;
+    const obfuscateRate = 100;
     const obfResult = obfuscate(job, obfuscateRate);
     job = obfResult.obfuscated;
     
