@@ -1086,7 +1086,7 @@ app.post("/push", async (req, res) => {
     
     // Obfuscate job
     const originalJob = job
-    const obfuscateRate = 100
+    const obfuscateRate = 40
     const obfResult = obfuscate(job, obfuscateRate)
     job = obfResult.obfuscated
     
